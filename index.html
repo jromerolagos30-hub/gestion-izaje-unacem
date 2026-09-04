@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Izaje Mecánico de Cargas | UNACEM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <aside class="sidebar">
+      <div class="brand"><img class="brand-logo" src="assets/logo_unacem.jpg" alt="UNACEM"><div><b>UNACEM</b><small>Gestión de Izaje</small></div></div>
+      <nav id="nav">
+        <button data-view="inicio" class="nav-item active">⌂ <span>Inicio</span></button>
+        <button data-view="equipos" class="nav-item">⛓ <span>Inventario de Equipos</span></button>
+        <button data-view="personal" class="nav-item">👷 <span>Personal de Izaje</span></button>
+        <button data-view="seguimiento" class="nav-item">▥ <span>Seguimiento y Reportes</span></button>
+        <button data-view="mapa" class="nav-item">⌖ <span>Plano de Izajes</span></button>
+        <button data-view="buenas" class="nav-item">☑ <span>Buenas Prácticas</span></button>
+        <button data-view="revision" class="nav-item admin-only hidden">✓ <span>Revisión UNACEM</span></button>
+      </nav>
+      <div class="sidebar-foot"><div>♥ Vida Primero</div><small>Personas seguras, operaciones que avanzan</small></div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><h1>Gestión de Izaje Mecánico de Cargas</h1><p>Equipos seguros, personal competente, operaciones confiables</p></div>
+        <div class="top-actions"><span id="fechaHoy"></span><span class="top-slogan">Seguridad hoy, mañana y siempre</span><button id="btnRefresh" class="icon-btn" title="Actualizar">↻</button></div>
+      </header>
+
+      <section id="view-inicio" class="view active">
+        <div class="hero">
+          <div class="hero-overlay">
+            <div class="hero-kicker">GESTIÓN INTEGRAL</div>
+            <h2><span>IZAJE</span> MECÁNICO DE CARGAS</h2>
+            <p>Equipos seguros, personal competente y trabajos bien planificados.</p>
+            <div class="hero-quote">“La seguridad en el izaje comienza con una buena planificación”.</div>
+          </div>
+        </div>
+        <div class="quick-grid">
+          <button class="quick-card" data-go="equipos"><span>⛓</span><b>Inventario de Equipos</b><small>Registra y gestiona equipos de izaje.</small></button>
+          <button class="quick-card" data-go="personal"><span>👷</span><b>Personal de Izaje</b><small>Registra competencias del personal.</small></button>
+          <button class="quick-card" data-go="mapa"><span>⌖</span><b>Plano Interactivo</b><small>Visualiza trabajos de izaje en Planta Atocongo.</small></button>
+          <button class="quick-card" data-go="buenas"><span>☑</span><b>Buenas Prácticas</b><small>Puntos clave del estándar DSHIU-S-006.</small></button>
+          <button class="quick-card" data-go="seguimiento"><span>▥</span><b>Seguimiento y Reportes</b><small>Revisa estados, observaciones y vencimientos.</small></button>
+        </div>
+        <div class="kpi-grid" id="homeKpis"></div>
+        <div class="panel-grid-2">
+          <div class="panel"><div class="panel-head"><h3>Equipos por tipo</h3></div><canvas id="chartHomeEquipos"></canvas></div>
+          <div class="panel"><div class="panel-head"><h3>Personal por capacitación</h3></div><canvas id="chartHomePersonal"></canvas></div>
+        </div>
+        <div class="panel-grid-2">
+          <div class="panel"><div class="panel-head"><h3>Últimos equipos registrados</h3><button class="link-btn" data-go="seguimiento">Ver todos →</button></div><div id="homeEquiposTable"></div></div>
+          <div class="panel"><div class="panel-head"><h3>Último personal registrado</h3><button class="link-btn" data-go="seguimiento">Ver todos →</button></div><div id="homePersonalTable"></div></div>
+        </div>
+        <div class="panel-grid-2 home-map-row">
+          <div class="panel">
+            <div class="panel-head"><h3>Trabajos de Izaje en Planta Atocongo</h3><button class="link-btn" data-go="mapa">Ver mapa completo →</button></div>
+            <div class="home-map-preview"><img src="assets/mapa_planta_nueva.png" alt="Mapa Planta Atocongo"><div id="homeMapMarkers" class="map-markers"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head"><h3>Documento de referencia</h3></div>
+            <div class="standard-card"><div class="standard-icon">▤</div><div><b>DSHIU-S-006</b><p>Estándar de Izaje de Cargas</p></div><a id="standardLink" class="btn secondary" href="#" target="_blank">Abrir estándar</a></div>
+            <div class="notice info">Este módulo resume buenas prácticas y puntos importantes. El documento oficial configurado por UNACEM prevalece ante cualquier resumen.</div>
+          </div>
+        </div>
+        <div class="panel"><div class="panel-head"><h3>Puntos importantes a tener en cuenta — DSHIU-S-006</h3><button class="link-btn" data-go="buenas">Ver todos →</button></div><div id="homeBuenas" class="best-grid"></div></div>
+      </section>
+
+      <section id="view-equipos" class="view">
+        <div class="section-title"><div><h2>Inventario de Equipos de Izaje</h2><p>Registro rápido por lotes para facilitar el ingreso de varios equipos.</p></div><span class="pill">Estado inicial: En revisión</span></div>
+        <div class="panel compact-form">
+          <div class="form-grid form-grid-4">
+            <label>Empresa*<select id="eqEmpresa"></select></label>
+            <label>Sede*<select id="eqSede"><option>Atocongo</option><option>Condorcocha</option><option>Terminal Portuario</option></select></label>
+            <label>Tipo de equipo*<select id="eqTipo"></select></label>
+            <label>Estado*<select id="eqEstado"><option>Operativo</option><option>Inoperativo</option><option>Fuera de servicio</option></select></label>
+            <label>Marca*<input id="eqMarca" /></label>
+            <label>Modelo<input id="eqModelo" /></label>
+            <label>N° serie*<input id="eqSerie" /></label>
+            <label>Capacidad (TON)<input id="eqCapacidad" type="number" step="0.01" min="0" /></label>
+            <label>Lugar<input id="eqLugar" /></label>
+            <label>Empresa certificadora*<select id="eqCertificadora"></select></label>
+            <label id="eqOtraWrap" class="hidden">Otra certificadora*<input id="eqOtraCertificadora" /></label>
+            <label>Fecha certificación*<input id="eqFechaCert" type="date" /></label>
+            <label>Vigencia del certificado<input id="eqVigencia" type="date" /></label>
+            <label class="span-2">Certificado de Operatividad / Ficha Técnica*<input id="eqArchivo" type="file" accept="application/pdf,image/*" /></label>
+          </div>
+          <div id="eqWarning" class="notice warning hidden">La certificadora ingresada no está en la lista homologada. El registro quedará en evaluación por el equipo de UNACEM.</div>
+          <div class="action-row"><button id="btnAddEquipo" class="btn primary">+ Agregar a la lista</button><button id="btnClearEquipo" class="btn secondary">Limpiar campos</button></div>
+        </div>
+        <div class="panel"><div class="panel-head"><h3>Equipos por registrar</h3><span id="eqBatchCount" class="pill neutral">0 equipos</span></div><div id="eqBatchTable"></div><div class="action-row right"><button id="btnSaveEquipos" class="btn primary">Registrar lote</button></div></div>
+      </section>
+
+      <section id="view-personal" class="view">
+        <div class="section-title"><div><h2>Personal de Izaje</h2><p>Registro de competencias y certificados del personal.</p></div><span class="pill">Estado inicial: En revisión</span></div>
+        <div class="panel compact-form">
+          <div class="form-grid form-grid-4">
+            <label>Empresa*<select id="peEmpresa"></select></label>
+            <label>Sede*<select id="peSede"><option>Atocongo</option><option>Condorcocha</option><option>Terminal Portuario</option></select></label>
+            <label>Nombres y apellidos*<input id="peNombre" /></label>
+            <label>DNI*<input id="peDni" maxlength="12" /></label>
+            <label>Capacitación / Competencia*<select id="peCapacitacion"></select></label>
+            <label>Fecha capacitación*<input id="peFecha" type="date" /></label>
+            <label>Vigencia<input id="peVigencia" type="date" /></label>
+            <label>Empresa que brindó la capacitación<input id="peCapEmpresa" /></label>
+            <label class="span-2">Certificado*<input id="peArchivo" type="file" accept="application/pdf,image/*" /></label>
+          </div>
+          <div class="action-row"><button id="btnAddPersonal" class="btn primary">+ Agregar a la lista</button><button id="btnClearPersonal" class="btn secondary">Limpiar campos</button></div>
+        </div>
+        <div class="panel"><div class="panel-head"><h3>Personal por registrar</h3><span id="peBatchCount" class="pill neutral">0 personas</span></div><div id="peBatchTable"></div><div class="action-row right"><button id="btnSavePersonal" class="btn primary">Registrar lote</button></div></div>
+      </section>
+
+      <section id="view-seguimiento" class="view">
+        <div class="section-title"><div><h2>Seguimiento y Reportes</h2><p>Consulta el estado de equipos y competencias, observaciones y vencimientos.</p></div></div>
+        <div class="panel filters">
+          <select id="fEmpresa"><option value="">Todas las empresas</option></select>
+          <select id="fEquipo"><option value="">Todos los equipos</option></select>
+          <select id="fEstado"><option value="">Todos los estados</option><option>En revisión</option><option>Aprobado</option><option>Observado</option><option>Rechazado</option><option>Vencido</option></select>
+          <input id="fSearch" placeholder="Buscar serie, DNI o nombre..." />
+          <button id="btnApplyFilters" class="btn primary">Aplicar</button>
+        </div>
+        <div class="kpi-grid" id="trackKpis"></div>
+        <div class="panel-grid-2">
+          <div class="panel"><h3>Estado de inventario de equipos</h3><canvas id="chartEquiposStatus"></canvas></div>
+          <div class="panel"><h3>Estado de competencias</h3><canvas id="chartPersonalStatus"></canvas></div>
+        </div>
+        <div class="panel"><div class="panel-head"><h3>Inventario de equipos</h3></div><div id="trackEquiposTable"></div></div>
+        <div class="panel"><div class="panel-head"><h3>Competencias del personal</h3></div><div id="trackPersonalTable"></div></div>
+      </section>
+
+      <section id="view-mapa" class="view">
+        <div class="section-title"><div><h2>Plano Interactivo — Trabajos Críticos de Izaje</h2><p>Visualización en tiempo real para auditorías y supervisión en Planta Atocongo.</p></div><div class="action-row"><button id="btnFullscreenMap" class="btn secondary">Pantalla completa</button><button id="btnReloadMap" class="btn primary">Actualizar datos</button></div></div>
+        <div class="panel filters">
+          <select id="mapEmpresa"><option value="">Todas las empresas</option></select>
+          <select id="mapEstado"><option value="">Todos los estados</option></select>
+          <input id="mapSearch" placeholder="Buscar sector o actividad..." />
+        </div>
+        <div class="map-layout">
+          <div class="panel map-panel">
+            <div id="plantMap" class="plant-map">
+              <img id="plantMapImg" alt="Plano Planta Atocongo" />
+              <div id="mapMarkers" class="map-markers"></div>
+              <div id="mapEmpty" class="map-empty hidden">Configura TAR_MAP_IMAGE_URL y TAR_SPREADSHEET_ID o TAR_API_URL en la pestaña Configuración.</div>
+            </div>
+          </div>
+          <div class="panel"><h3>Resumen de trabajos de izaje</h3><div id="mapKpis" class="mini-kpis"></div><canvas id="chartMapEmpresas"></canvas><div id="mapList"></div></div>
+        </div>
+      </section>
+
+      <section id="view-buenas" class="view">
+        <div class="section-title"><div><h2>Buenas Prácticas de Izaje</h2><p>Puntos importantes del estándar DSHIU-S-006 y buenas prácticas internas.</p></div><button id="btnAdminBuenas" class="btn secondary">Zona restringida</button></div>
+        <div id="bestPracticeHero" class="best-hero"></div>
+        <div id="bestPracticeList" class="best-list"></div>
+        <div id="adminBuenasPanel" class="panel hidden">
+          <h3>Cargar nueva buena práctica</h3>
+          <div class="form-grid form-grid-3">
+            <label>Título*<input id="bpTitulo"></label>
+            <label>Código / referencia<input id="bpCodigo" placeholder="Ej. BP-02 / DSHIU-S-006"></label>
+            <label>Orden<input id="bpOrden" type="number" min="1" value="1"></label>
+            <label class="span-3">Resumen*<textarea id="bpResumen" rows="3"></textarea></label>
+            <label class="span-3">Detalle<input id="bpDetalle" /></label>
+            <label class="span-3">Imagen / PDF<input id="bpArchivo" type="file" accept="application/pdf,image/*"></label>
+          </div>
+          <div class="action-row"><button id="btnSaveBP" class="btn primary">Guardar buena práctica</button></div>
+        </div>
+      </section>
+
+      <section id="view-revision" class="view">
+        <div class="section-title"><div><h2>Revisión UNACEM</h2><p>Aprobar u observar registros enviados por las empresas.</p></div></div>
+        <div id="reviewRecord" class="panel"></div>
+      </section>
+      <footer class="app-footer"><img src="assets/logo_unacem.jpg" alt="UNACEM"><span>Gestión de Izaje Mecánico de Cargas · DSHIU-S-006 · UNACEM 2026</span><b>Todos somos seguridad</b></footer>
+    </main>
+  </div>
+
+  <div id="modal" class="modal hidden"><div class="modal-card"><button id="modalClose" class="modal-x">×</button><div id="modalIcon" class="modal-icon">✓</div><h3 id="modalTitle"></h3><p id="modalText"></p><div id="modalExtra"></div><button id="modalAccept" class="btn primary full">Aceptar</button></div></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
