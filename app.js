@@ -28,7 +28,10 @@ function colors(n){return ['#ed1c24','#3ba0df','#22a05a','#f0ae22','#805ad5','#6
 function drawChart(id,type,data,key,legend=true){const el=$('#'+id);if(!el)return;if(state.charts[key])state.charts[key].destroy();const labels=Object.keys(data),vals=Object.values(data);state.charts[key]=new Chart(el,{type,data:{labels,datasets:[{label:'Cantidad',data:vals,backgroundColor:colors(labels.length),borderWidth:type==='doughnut'?1:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:legend,position:'bottom'},datalabels:{color:type==='doughnut'?'#fff':'#263442',anchor:type==='bar'?'end':'center',align:type==='bar'?'top':'center',font:{weight:'700'},formatter:v=>v||''}},scales:type==='bar'?{y:{beginAtZero:true,ticks:{precision:0}}}:{}}})}
 function drawCompanyStatus(id,arr,key){const el=$('#'+id);if(!el)return;if(state.charts[key])state.charts[key].destroy();const companies=[...new Set(arr.map(x=>x.empresa||'Sin empresa'))];const statuses=['Aprobado','En revisión','Observado'];const palette=['#22a05a','#f0ae22','#ed1c24'];const datasets=statuses.map((s,i)=>({label:s,data:companies.map(c=>arr.filter(x=>(x.empresa||'Sin empresa')===c&&norm(x.estadoRevision)===norm(s)).length),backgroundColor:palette[i]}));state.charts[key]=new Chart(el,{type:'bar',data:{labels:companies,datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},datalabels:{color:'#263442',anchor:'end',align:'top',font:{weight:'700'},formatter:v=>v||''}},scales:{x:{stacked:true},y:{stacked:true,beginAtZero:true,ticks:{precision:0}}}}})}
 async function refreshData(){const d=await api('getData');Object.assign(state,d);populateSelectors();renderHome();renderEquiposStats();renderPersonalStats();renderSeguimiento();renderBuenas();renderControles();renderReviewQueue();renderMapa()}
-function populateSelectors(){const emps=(state.empresas||[]).filter(x=>String(x.activo||'SI').toUpperCase()!=='NO').map(x=>x.empresa);['eqEmpresa','peEmpresa','fEmpresa','mapEmpresa','coEmpresa','coFiltroEmpresa','rvEmpresa'].forEach(id=>setOptions($('#'+id),emps,['fEmpresa','mapEmpresa','coFiltroEmpresa','rvEmpresa'].includes(id)?'Todas las empresas':'Seleccionar empresa'));setOptions($('#eqTipo'),state.tipos||[],'Seleccionar equipo');setOptions($('#peCapacitacion'),state.competencias||[],'Seleccionar competencia');setOptions($('#fEquipo'),state.tipos||[],'Todos los equipos');setOptions($('#eqCertificadora'),[...(state.certificadoras||[]),'Certificado del propio fabricante','Otro'],'Seleccionar certificadora');setOptions($('#bpCategoria'),CATS,'Seleccionar apartado')}
+function populateSelectors(){const emps=(state.empresas||[]).filter(x=>String(x.activo||'SI').toUpperCase()!=='NO').map(x=>x.empresa);['eqEmpresa','peEmpresa','fEmpresa','mapEmpresa','coEmpresa','coFiltroEmpresa','rvEmpresa'].forEach(id=>setOptions($('#'+id),emps,['fEmpresa','mapEmpresa','coFiltroEmpresa','rvEmpresa'].includes(id)?'Todas las empresas':'Seleccionar empresa'));setOptions($('#eqTipo'),state.tipos||[],'Seleccionar equipo');setOptions($('#peCapacitacion'),state.competencias||[],'Seleccionar competencia');setOptions($('#fEquipo'),state.tipos||[],'Todos los equipos');const certBase=[...(state.certificadoras||[])];
+const certFallback=['COPMEC','Operatec','Certifica','CS BEAVER','Bureau Veritas','Industry Certificaciones','SGS'];
+certFallback.forEach(x=>{if(!certBase.some(v=>norm(v)===norm(x)))certBase.push(x)});
+setOptions($('#eqCertificadora'),[...certBase,'Certificado del propio fabricante','Otro'],'Seleccionar certificadora');setOptions($('#bpCategoria'),CATS,'Seleccionar apartado')}
 function renderHome(){renderHomeMapPreview()}
 function renderEquiposStats(){const a=state.equipos||[];if($('#eqKpis'))$('#eqKpis').innerHTML=[['Equipos registrados',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawChart('chartEquiposTipo','doughnut',countBy(a,'tipo'),'eqTipo',true);drawChart('chartEquiposRevision','doughnut',countBy(a,'estadoRevision'),'eqRev',true)}
 function renderPersonalStats(){const a=state.personal||[];if($('#peKpis'))$('#peKpis').innerHTML=[['Personal registrado',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawChart('chartPersonalCap','doughnut',countBy(a,'capacitacion'),'peCap',true);drawChart('chartPersonalRevision','doughnut',countBy(a,'estadoRevision'),'peRev',true)}
@@ -52,21 +55,153 @@ function driveThumb(url){const id=driveId(url);return id?`https://drive.google.c
 function attachmentsHtml(v){const urls=parseUrls(v);if(!urls.length)return'<div class="notice">Sin documentos adjuntos.</div>';return `<h3>Documentos adjuntos</h3><div class="attachment-grid">${urls.map((u,i)=>`<div class="attachment-view"><img src="${esc(driveThumb(u))}" alt="Vista previa documento ${i+1}" onerror="this.style.display='none'"><div style="padding:8px"><a class="btn secondary" href="${esc(u)}" target="_blank">Abrir archivo ${i+1}</a></div></div>`).join('')}</div>`}
 function recordDetailHtml(x){const omit=['id','archivos','archivoUrls'];const details=Object.entries(x).filter(([k,v])=>!omit.includes(k)&&v!==''&&v!=null).map(([k,v])=>`<div class="detail-item"><b>${esc(k)}</b>${esc(v)}</div>`).join('');return `<div class="detail-grid">${details}</div>${attachmentsHtml(x.archivos||x.archivoUrls||[])}`}
 window.viewRecord=(type,id)=>{const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);if(x)showModal(type==='equipo'?'Detalle del equipo':'Detalle de competencia',recordDetailHtml(x))}
-window.deleteRecord=async(type,id,empresa)=>{const key=prompt(`Para eliminar, ingresa la clave de ${empresa} (NombreEmpresa2026).`);if(!key)return;try{await api('deleteRecord',{type,id,key});await refreshData();showModal('Registro eliminado','<p>El registro fue eliminado correctamente.</p>')}catch(e){showModal('No se pudo eliminar',`<p>${esc(e.message)}</p>`)}}
+window.deleteRecord=async(type,id,empresa)=>{const key=prompt('Ingrese la clave de eliminación:');if(!key)return;try{await api('deleteRecord',{type,id,key});await refreshData();showModal('Registro eliminado','<p>El registro fue eliminado correctamente.</p>')}catch(e){showModal('No se pudo eliminar',`<p>${esc(e.message)}</p>`)}}
 window.editRecord=(type,id)=>{const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);if(!x)return;const observed=norm(x.estadoRevision).includes('observ');const common=`${observed?`<div class="notice warning"><b>Observación UNACEM:</b> ${esc(x.observacion||'')}</div>`:''}${attachmentsHtml(x.archivos)}`;if(type==='equipo'){showModal(observed?'Levantar observación del equipo':'Editar equipo',`${common}<div class="form-grid form-grid-3" style="margin-top:14px"><label>Marca<input id="editMarca" value="${esc(x.marca)}"></label><label>Modelo<input id="editModelo" value="${esc(x.modelo)}"></label><label>Serie<input id="editSerie" value="${esc(x.serie)}"></label><label>Capacidad TON<input id="editCapacidad" value="${esc(x.capacidad)}"></label><label>Lugar<input id="editLugar" value="${esc(x.lugar)}"></label><label>Fecha certificación<input id="editFechaCert" type="date" value="${dateInput(x.fechaCert)}"></label><label>Vigencia<input id="editVigencia" type="date" value="${dateInput(x.vigencia)}" readonly></label><label class="span-2">Agregar documentos para levantar observación<input id="editFiles" type="file" multiple accept="image/*,.pdf"></label><label class="span-3">Comentario de la empresa<textarea id="editComment" rows="3">${esc(x.observacionEmpresa||'')}</textarea></label></div><button id="btnSaveEdit" class="btn primary full" style="margin-top:12px" onclick="saveFullEdit('equipo','${id}')">Enviar actualización a revisión</button>`);setTimeout(()=>{$('#editFechaCert').onchange=()=>$('#editVigencia').value=$('#editFechaCert').value?addYears($('#editFechaCert').value,1):''},0)}else{showModal(observed?'Levantar observación de competencia':'Editar competencia',`${common}<div class="form-grid form-grid-3" style="margin-top:14px"><label>Nombre<input id="editNombre" value="${esc(x.nombre)}"></label><label>DNI<input id="editDni" value="${esc(x.dni)}"></label><label>Capacitación<input id="editCap" value="${esc(x.capacitacion)}"></label><label>Fecha capacitación<input id="editFecha" type="date" value="${dateInput(x.fecha)}"></label><label>Vigencia<input id="editVigencia" type="date" value="${dateInput(x.vigencia)}" readonly></label><label>Empresa capacitadora<input value="ISEM" readonly></label><label class="span-2">Agregar documentos para levantar observación<input id="editFiles" type="file" multiple accept="image/*,.pdf"></label><label class="span-3">Comentario de la empresa<textarea id="editComment" rows="3">${esc(x.observacionEmpresa||'')}</textarea></label></div><button id="btnSaveEdit" class="btn primary full" style="margin-top:12px" onclick="saveFullEdit('personal','${id}')">Enviar actualización a revisión</button>`);setTimeout(()=>{$('#editFecha').onchange=()=>$('#editVigencia').value=$('#editFecha').value?addYears($('#editFecha').value,2):''},0)}}
 function dateInput(v){if(!v)return'';const d=new Date(v);return isNaN(d)?String(v).slice(0,10):d.toISOString().slice(0,10)}
 window.saveFullEdit=async(type,id)=>{const btn=$('#btnSaveEdit');if(btn.disabled)return;btn.disabled=true;btn.textContent='Procesando...';try{const newFiles=await filesToObjs($('#editFiles'),8);let updates;if(type==='equipo')updates={Marca:$('#editMarca').value,Modelo:$('#editModelo').value,Serie:$('#editSerie').value,Capacidad:$('#editCapacidad').value,Lugar:$('#editLugar').value,FechaCertificacion:$('#editFechaCert').value,Vigencia:$('#editVigencia').value,ObservacionEmpresa:$('#editComment').value};else updates={Nombre:$('#editNombre').value,DNI:$('#editDni').value,Capacitacion:$('#editCap').value,FechaCapacitacion:$('#editFecha').value,Vigencia:$('#editVigencia').value,EmpresaCapacitadora:'ISEM',ObservacionEmpresa:$('#editComment').value};await api('updateRecord',{type,id,updates,newFiles});closeModal();await refreshData();showModal('Actualización enviada','<p>El registro volvió a estado <b>En revisión</b> con los nuevos documentos adjuntos.</p>')}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}finally{if(btn){btn.disabled=false;btn.textContent='Enviar actualización a revisión'}}}
 window.exportMasterPDF=(type)=>{const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});const arr=type==='equipos'?filtered().fe:filtered().fp;doc.setFontSize(15);doc.text(type==='equipos'?'MASTER DE EQUIPOS DE IZAJE':'MASTER DE COMPETENCIAS DEL PERSONAL',14,13);doc.setFontSize(8);doc.text('UNACEM - Gestión de Izaje Mecánico de Cargas',14,18);let heads,body;if(type==='equipos'){heads=[['Empresa','Sede','Tipo','Marca','Modelo','Serie','Cap. TON','Estado Equipo','Certificadora','Fecha Cert.','Vigencia','Estado Revisión','Observación']];body=arr.map(x=>[x.empresa,x.sede,x.tipo,x.marca,x.modelo,x.serie,x.capacidad,x.estado,x.certificadoraFinal||x.certificadora,fmtDate(x.fechaCert),fmtDate(x.vigencia),x.estadoRevision,x.observacion||''])}else{heads=[['Empresa','Sede','Nombre','DNI','Competencia','Fecha Capacitación','Vigencia','Capacitadora','Estado Revisión','Observación']];body=arr.map(x=>[x.empresa,x.sede,x.nombre,x.dni,x.capacitacion,fmtDate(x.fecha),fmtDate(x.vigencia),'ISEM',x.estadoRevision,x.observacion||''])}doc.autoTable({head:heads,body,startY:22,styles:{fontSize:6.5,cellPadding:1.5},headStyles:{fillColor:[237,28,36]},margin:{left:8,right:8}});doc.save(type==='equipos'?'Master_Equipos_Izaje.pdf':'Master_Competencias_Izaje.pdf')}
 function markerClass(s){const n=norm(s);return n.includes('program')?'programado':n.includes('final')?'finalizado':n.includes('ejec')?'ejecucion':'otro'}
 function renderHomeMapPreview(){const root=$('#homeMapMarkers');if(!root)return;root.innerHTML='';(state.mapData||[]).filter(x=>x.x!=null&&x.y!=null).slice(0,50).forEach(x=>{const b=document.createElement('span');b.className=`marker ${markerClass(x.estado)}`;b.style.left=`${x.x}%`;b.style.top=`${x.y}%`;b.title=`${x.empresa||''} - ${x.sector||''}`;root.appendChild(b)})}
-async function reloadMap(){try{state.mapData=await api('getIzajesTar');renderMapa();renderHomeMapPreview()}catch(e){showModal('Error al actualizar mapa',`<p>${esc(e.message)}</p>`)}}
+
+function jsonpTar(action,params={}){
+  return new Promise((resolve,reject)=>{
+    if(!cfg.TAR_API_URL)return reject(new Error('TAR_API_URL no configurado.'));
+    const cb='tarcb_'+Date.now()+'_'+Math.floor(Math.random()*99999);
+    const s=document.createElement('script');
+    window[cb]=data=>{try{resolve(data)}finally{delete window[cb];s.remove()}};
+    const q=new URLSearchParams({action,callback:cb,...params});
+    s.src=cfg.TAR_API_URL+'?'+q.toString();
+    s.onerror=()=>{delete window[cb];s.remove();reject(new Error('No se pudo consultar el aplicativo de Alto Riesgo.'))};
+    document.body.appendChild(s);
+  });
+}
+function tarArr(v){
+  if(Array.isArray(v))return v;
+  if(!v)return[];
+  try{const p=JSON.parse(v);return Array.isArray(p)?p:[v]}catch(e){return String(v).split(' | ').filter(Boolean)}
+}
+function tarSectorKey(v){return norm(v).trim().replace(/\s+/g,' ')}
+function tarIsActive(r){return norm(r.EstadoOperativo||'ACTIVO')!=='finalizado'}
+async function loadTarExact(){
+  const res=await jsonpTar('bootstrap');
+  if(!res?.ok)throw new Error('El aplicativo de Alto Riesgo no devolvió información.');
+  const sectores=(res.data?.sectores||[]).map(s=>({
+    nombre:s.nombre||s.Nombre||s.Sector||'',
+    x:Number(s.x??s.X??0),
+    y:Number(s.y??s.Y??0)
+  })).filter(s=>s.nombre&&Number.isFinite(s.x)&&Number.isFinite(s.y));
+  const sectorMap=Object.fromEntries(sectores.map(s=>[tarSectorKey(s.nombre),s]));
+  const regs=(res.data?.registros||[]).filter(tarIsActive).filter(r=>tarArr(r.TrabajoCritico).some(t=>norm(t).includes('izaje')));
+  return regs.map(r=>{
+    const sector=sectorMap[tarSectorKey(r.Lugar)]||null;
+    return {
+      empresa:r.Empresa||'',
+      sector:r.Lugar||'',
+      actividad:r.Descripcion||tarArr(r.TrabajoCritico).join(', '),
+      tipoTrabajo:tarArr(r.TrabajoCritico).join(', '),
+      estado:r.EstadoOperativo==='FINALIZADO'?'Finalizado':'En ejecución',
+      fecha:r.Fecha||'',
+      trabajadores:Number(r.NTrabajadores||0),
+      x:sector?sector.x:(Number.isFinite(Number(r.X))?Number(r.X):null),
+      y:sector?sector.y:(Number.isFinite(Number(r.Y))?Number(r.Y):null)
+    };
+  });
+}
+async function reloadMap(){
+  try{
+    try{state.mapData=await loadTarExact()}
+    catch(exactErr){
+      console.warn('Se usará el respaldo del backend de Izaje:',exactErr);
+      state.mapData=await api('getIzajesTar');
+    }
+    renderMapa();renderHomeMapPreview();
+  }catch(e){showModal('Error al actualizar mapa',`<p>${esc(e.message)}</p>`)}
+}
 function renderMapa(){const emp=$('#mapEmpresa')?.value||'',st=$('#mapEstado')?.value||'',q=norm($('#mapSearch')?.value||'');const arr=(state.mapData||[]).filter(x=>(!emp||x.empresa===emp)&&(!st||x.estado===st)&&(!q||norm(JSON.stringify(x)).includes(q)));const mk=$('#mapMarkers');if(!mk)return;mk.innerHTML='';arr.forEach(x=>{if(x.x==null||x.y==null)return;const b=document.createElement('button');b.className=`marker ${markerClass(x.estado)}`;b.style.left=`${x.x}%`;b.style.top=`${x.y}%`;b.onclick=()=>showMarker(x,b);mk.appendChild(b)});$('#mapKpis').innerHTML=[['Trabajos',arr.length],['Empresas',new Set(arr.map(x=>x.empresa)).size],['En ejecución',arr.filter(x=>norm(x.estado).includes('ejec')).length]].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div></div>`).join('');drawChart('chartMapEmpresas','bar',countBy(arr,'empresa'),'mapEmp',false);$('#mapList').innerHTML=tableSimple(arr,['empresa','sector','actividad','estado'],['Empresa','Sector','Actividad','Estado'])}
 function showMarker(x,b){$$('.marker-card').forEach(e=>e.remove());const c=document.createElement('div');c.className='marker-card';c.style.left=`calc(${b.style.left} + 15px)`;c.style.top=`calc(${b.style.top} + 15px)`;c.innerHTML=`<b>${esc(x.sector||'Trabajo de izaje')}</b><br>Empresa: ${esc(x.empresa)}<br>${esc(x.actividad||'')}<br>Estado: ${esc(x.estado||'')}`;$('#plantMap').appendChild(c);setTimeout(()=>c.remove(),7000)}
-function practicePreview(url){const u=String(url||'');if(!u)return'<div class="pdf-tile">Sin imagen cargada</div>';return `<img src="${esc(driveThumb(u))}" alt="Vista previa" loading="lazy" onerror="this.outerHTML='<div class=&quot;pdf-tile&quot;>Vista previa no disponible. Usa Abrir / descargar.</div>'">`}
-function renderBuenas(){const root=$('#bestPracticeSections');if(!root)return;const arr=state.buenas||[];root.innerHTML=CATS.map(cat=>{const items=arr.filter(x=>norm(x.categoria||'Otras buenas prácticas')===norm(cat));return `<div class="practice-section panel"><div class="practice-title"><h3>${esc(cat)}</h3><span class="pill neutral">${items.length} material(es)</span></div>${items.length?`<div class="best-list">${items.map(bestCardHtml).join('')}</div>`:`<div class="empty-practice">Aún no se ha cargado material en este apartado.</div>`}</div>`}).join('')}
-function bestCardHtml(x){const u=parseUrls(x.archivoUrl||[])[0]||x.archivoUrl||'';return `<article class="best-card"><h4>${esc(x.titulo)}</h4><div class="best-preview">${practicePreview(u)}</div><p>${esc(x.detalle||'')}</p><div class="action-row"><button class="btn secondary" onclick="viewBestPractice('${x.id}')">Ver más grande</button>${u?`<a class="btn primary" href="${esc(u)}" target="_blank">Abrir / descargar</a>`:''}</div></article>`}
-window.viewBestPractice=id=>{const x=(state.buenas||[]).find(r=>r.id===id);if(!x)return;const u=parseUrls(x.archivoUrl||[])[0]||x.archivoUrl||'';showModal(x.titulo,`<div class="best-preview" style="height:min(76vh,900px)">${practicePreview(u)}</div><p>${esc(x.detalle||'')}</p>${u?`<a class="btn primary" href="${esc(u)}" target="_blank">Abrir / descargar archivo</a>`:''}`)}
-async function saveBuenaPractica(){const titulo=$('#bpTitulo').value.trim(),categoria=$('#bpCategoria').value;if(!categoria||!titulo)return showModal('Faltan datos','<p>Selecciona el apartado e ingresa el título.</p>');const fs=await filesToObjs($('#bpArchivo'),1);if(!fs.length)return showModal('Falta archivo','<p>Adjunta una imagen o PDF.</p>');await api('saveBuenaPractica',{key:cfg.ADMIN_KEY,item:{categoria,titulo,detalle:$('#bpDetalle').value.trim(),archivo:fs[0]}});$('#bpTitulo').value='';$('#bpDetalle').value='';$('#bpArchivo').value='';await refreshData();showModal('Material guardado','<p>Ya se encuentra disponible para las empresas.</p>')}
+
+const previewCache=new Map();
+async function fetchDrivePreview(url){
+  if(!url)return'';
+  if(previewCache.has(url))return previewCache.get(url);
+  const p=api('getDrivePreview',{url}).then(d=>d?.dataUrl||'').catch(()=> '');
+  previewCache.set(url,p);
+  return p;
+}
+function practicePreview(url,id=''){
+  const u=String(url||'');
+  if(!u)return'<div class="pdf-tile">Sin imagen cargada</div>';
+  const token='bpimg_'+String(id||Math.random()).replace(/[^\w-]/g,'');
+  setTimeout(async()=>{
+    const el=document.getElementById(token);
+    if(!el)return;
+    const data=await fetchDrivePreview(u);
+    if(data){
+      el.innerHTML=`<img src="${data}" alt="Vista previa" loading="lazy">`;
+    }else{
+      el.innerHTML='<div class="pdf-tile">Vista previa no disponible. Usa Abrir / descargar.</div>';
+    }
+  },0);
+  return `<div id="${token}" class="preview-loading">Cargando vista previa…</div>`;
+}
+function renderBuenas(){
+  const root=$('#bestPracticeSections');if(!root)return;
+  const arr=state.buenas||[];
+  root.innerHTML=CATS.map(cat=>{
+    const items=arr.filter(x=>norm(x.categoria||'Otras buenas prácticas')===norm(cat));
+    return `<div class="practice-section panel"><div class="practice-title"><h3>${esc(cat)}</h3><span class="pill neutral">${items.length} material(es)</span></div>${items.length?`<div class="best-list">${items.map(bestCardHtml).join('')}</div>`:`<div class="empty-practice">Aún no se ha cargado material en este apartado.</div>`}</div>`
+  }).join('');
+  renderAdminBuenasList();
+}
+function bestCardHtml(x){
+  const u=parseUrls(x.archivoUrl||[])[0]||x.archivoUrl||'';
+  return `<article class="best-card"><h4>${esc(x.titulo)}</h4><div class="best-preview">${practicePreview(u,x.id)}</div><p>${esc(x.detalle||'')}</p><div class="action-row"><button class="btn secondary" onclick="viewBestPractice('${x.id}')">Ver más grande</button>${u?`<a class="btn primary" href="${esc(u)}" target="_blank">Abrir / descargar</a>`:''}</div></article>`
+}
+window.viewBestPractice=async id=>{
+  const x=(state.buenas||[]).find(r=>r.id===id);if(!x)return;
+  const u=parseUrls(x.archivoUrl||[])[0]||x.archivoUrl||'';
+  showModal(x.titulo,`<div id="practiceModalPreview" class="practice-modal-scroll"><div class="preview-loading">Cargando imagen…</div></div><p>${esc(x.detalle||'')}</p>${u?`<a class="btn primary" href="${esc(u)}" target="_blank">Abrir / descargar archivo</a>`:''}`);
+  const data=await fetchDrivePreview(u);
+  const root=$('#practiceModalPreview');
+  if(root)root.innerHTML=data?`<img src="${data}" alt="${esc(x.titulo)}">`:'<div class="notice">No fue posible generar la vista previa. Usa “Abrir / descargar archivo”.</div>';
+}
+function renderAdminBuenasList(){
+  const root=$('#adminBuenasList');if(!root)return;
+  const arr=state.buenas||[];
+  root.innerHTML=arr.length?arr.map(x=>`<div class="admin-material-row"><div><b>${esc(x.titulo)}</b><br><small>${esc(x.categoria||'Otras buenas prácticas')}</small></div><small>${fmtDate(x.fechaRegistro)}</small><div class="admin-material-actions"><button class="btn secondary" onclick="editBuenaPractica('${x.id}')">Editar</button><button class="btn danger" onclick="deleteBuenaPractica('${x.id}')">Eliminar</button></div></div>`).join(''):'<div class="empty-practice">No hay materiales cargados.</div>';
+}
+window.editBuenaPractica=id=>{
+  const x=(state.buenas||[]).find(r=>r.id===id);if(!x)return;
+  showModal('Editar material UNACEM',`<div class="form-grid form-grid-3">
+    <label>Apartado*<select id="editBpCategoria">${CATS.map(c=>`<option ${norm(c)===norm(x.categoria)?'selected':''}>${esc(c)}</option>`).join('')}</select></label>
+    <label>Título*<input id="editBpTitulo" value="${esc(x.titulo)}"></label>
+    <label class="span-2">Reemplazar imagen/PDF (opcional)<input id="editBpArchivo" type="file" accept="image/*,.pdf"></label>
+    <label class="span-3">Detalle<textarea id="editBpDetalle" rows="4">${esc(x.detalle||'')}</textarea></label>
+  </div><button id="btnUpdateBp" class="btn primary full" onclick="saveBuenaPracticaEdit('${id}')">Guardar cambios</button>`);
+}
+window.saveBuenaPracticaEdit=async id=>{
+  const btn=$('#btnUpdateBp');if(btn.disabled)return;btn.disabled=true;
+  try{
+    const fs=await filesToObjs($('#editBpArchivo'),1);
+    await api('updateBuenaPractica',{key:cfg.ADMIN_KEY,id,item:{categoria:$('#editBpCategoria').value,titulo:$('#editBpTitulo').value.trim(),detalle:$('#editBpDetalle').value.trim(),archivo:fs[0]||null}});
+    previewCache.clear();closeModal();await refreshData();$('#adminBuenasPanel').classList.remove('hidden');showModal('Material actualizado','<p>Los cambios fueron guardados correctamente.</p>');
+  }catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}finally{if(btn)btn.disabled=false}
+}
+window.deleteBuenaPractica=async id=>{
+  const k=prompt('Ingrese la clave de zona restringida para eliminar el material:');if(!k)return;
+  if(!confirm('¿Deseas eliminar este material?'))return;
+  try{await api('deleteBuenaPractica',{key:k,id});previewCache.clear();await refreshData();$('#adminBuenasPanel').classList.remove('hidden')}catch(e){showModal('No se pudo eliminar',`<p>${esc(e.message)}</p>`)}
+}
+async function saveBuenaPractica(){
+  const titulo=$('#bpTitulo').value.trim(),categoria=$('#bpCategoria').value;
+  if(!categoria||!titulo)return showModal('Faltan datos','<p>Selecciona el apartado e ingresa el título.</p>');
+  const fs=await filesToObjs($('#bpArchivo'),1);
+  if(!fs.length)return showModal('Falta archivo','<p>Adjunta una imagen o PDF.</p>');
+  await api('saveBuenaPractica',{key:cfg.ADMIN_KEY,item:{categoria,titulo,detalle:$('#bpDetalle').value.trim(),archivo:fs[0]}});
+  $('#bpTitulo').value='';$('#bpDetalle').value='';$('#bpArchivo').value='';
+  previewCache.clear();await refreshData();$('#adminBuenasPanel').classList.remove('hidden');
+  showModal('Material guardado','<p>El material fue cargado y ya se contabiliza en su apartado.</p>')
+}
 function previewPhotos(input,root){const files=[...(input.files||[])].slice(0,4);root.innerHTML='';files.forEach(f=>{const img=document.createElement('img');img.src=URL.createObjectURL(f);root.appendChild(img)});if((input.files||[]).length>4)showModal('Máximo 4 fotos','<p>Solo se tomarán las primeras 4 fotos.</p>')}
 async function saveControles(){const empresa=$('#coEmpresa').value,mes=$('#coMes').value,anio=$('#coAnio').value;if(!empresa||!mes||!anio)return showModal('Faltan datos','<p>Selecciona empresa, mes y año.</p>');const [f1,f2,f3]=await Promise.all([filesToObjs($('#coFotos1'),4),filesToObjs($('#coFotos2'),4),filesToObjs($('#coFotos3'),4)]);if(!f1.length||!f2.length||!f3.length)return showModal('Evidencia mínima requerida','<p>Cada control debe tener al menos 1 fotografía.</p>');await api('saveControles',{item:{empresa,mes,anio:Number(anio),fotos1:f1,fotos2:f2,fotos3:f3}});['coFotos1','coFotos2','coFotos3'].forEach(id=>$('#'+id).value='');['coPrev1','coPrev2','coPrev3'].forEach(id=>$('#'+id).innerHTML='');await refreshData();showModal('Controles registrados','<p>El mes quedó con estatus <b>Cumplido</b>.</p>')}
 function renderControles(){const emp=$('#coFiltroEmpresa')?.value||'';const arr=(state.controles||[]).filter(x=>!emp||x.empresa===emp);$('#coTable').innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Empresa</th><th>Mes</th><th>Año</th><th>Almacenamiento</th><th>Inspección mensual</th><th>Reunión previa</th><th>Estatus</th><th>Acción</th></tr></thead><tbody>${arr.map(x=>`<tr><td>${esc(x.empresa)}</td><td>${esc(x.mes)}</td><td>${esc(x.anio)}</td><td>${parseUrls(x.fotos1).length} foto(s)</td><td>${parseUrls(x.fotos2).length} foto(s)</td><td>${parseUrls(x.fotos3).length} foto(s)</td><td>${statusBadge(x.estatus)}</td><td><button class="link-btn" onclick="viewControl('${x.id}')">Ver evidencias</button></td></tr>`).join('')||'<tr><td colspan="8">Sin registros.</td></tr>'}</tbody></table></div>`}
@@ -74,5 +209,5 @@ window.viewControl=id=>{const x=(state.controles||[]).find(r=>r.id===id);if(!x)r
 function renderReviewQueue(){if(!state.reviewUnlocked||!$('#reviewQueue'))return;const type=$('#rvTipo')?.value||'',st=$('#rvEstado')?.value||'En revisión',emp=$('#rvEmpresa')?.value||'';let rows=[];(state.equipos||[]).forEach(x=>rows.push({...x,_type:'equipo'}));(state.personal||[]).forEach(x=>rows.push({...x,_type:'personal'}));rows=rows.filter(x=>(!type||x._type===type)&&(!st||x.estadoRevision===st)&&(!emp||x.empresa===emp));$('#reviewQueue').innerHTML=rows.map(x=>`<div class="review-card"><div class="panel-head"><div><b>${x._type==='equipo'?esc(x.tipo):esc(x.nombre)}</b><div style="color:var(--muted);font-size:12px">${esc(x.empresa)} · ${x._type==='equipo'?esc(x.serie):esc(x.dni)}</div></div>${statusBadge(x.estadoRevision)}</div><button class="btn secondary" onclick="openReview('${x._type}','${x.id}')">Ver registro y revisar</button></div>`).join('')||'<div class="notice">No hay registros con los filtros seleccionados.</div>'}
 window.openReview=(type,id)=>{const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);if(!x)return;const options=(state.aprobadores||[]).map(a=>`<option>${esc(a.nombre)}</option>`).join('');showModal('Revisión UNACEM',`<div class="review-grid"><div>${recordDetailHtml(x)}</div><div><label>Revisor UNACEM*<select id="reviewerName"><option value="">Seleccionar</option>${options}</select></label><label>Resultado*<select id="reviewStatus"><option value="Aprobado">Aprobado</option><option value="Observado">Observado</option></select></label><label>Comentarios<textarea id="reviewComment" rows="6" placeholder="Obligatorio si el estado es Observado"></textarea></label><button id="btnSubmitReview" class="btn primary full" onclick="submitInAppReview('${type}','${id}')">Guardar revisión</button></div></div>`)}
 window.submitInAppReview=async(type,id)=>{const btn=$('#btnSubmitReview');if(btn.disabled)return;const reviewer=$('#reviewerName').value,status=$('#reviewStatus').value,comment=$('#reviewComment').value.trim();if(!reviewer)return alert('Selecciona tu nombre de la lista.');if(status==='Observado'&&!comment)return alert('Debes ingresar comentarios cuando el registro es Observado.');btn.disabled=true;try{await api('reviewRecord',{type,id,reviewer,status,comment});closeModal();await refreshData();showModal('Revisión guardada',`<p>El registro quedó <b>${esc(status)}</b>.</p>`)}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}}
-async function init(){document.title=cfg.APP_NAME||document.title;$('#fechaHoy').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$$('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',renderSeguimiento));$('#btnApplyFilters').onclick=renderSeguimiento;['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',renderMapa));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();$('#btnUnlockBuenas').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminBuenasPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la zona restringida.</p>')};$('#btnSaveBuena').onclick=disableDuring($('#btnSaveBuena'),saveBuenaPractica);$('#coAnio').value=new Date().getFullYear();$('#coMes').value=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][new Date().getMonth()];[['coFotos1','coPrev1'],['coFotos2','coPrev2'],['coFotos3','coPrev3']].forEach(([i,p])=>$('#'+i).onchange=()=>previewPhotos($('#'+i),$('#'+p)));$('#btnSaveControles').onclick=disableDuring($('#btnSaveControles'),saveControles);$('#coFiltroEmpresa').onchange=renderControles;$('#btnUnlockReview').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY){state.reviewUnlocked=true;$('#reviewLocked').classList.add('hidden');$('#reviewArea').classList.remove('hidden');renderReviewQueue()}else if(k)showModal('Clave incorrecta','<p>No se habilitó la revisión.</p>')};$('#btnRenderReview').onclick=renderReviewQueue;try{await refreshData()}catch(e){showModal('Falta conectar el backend',`<p>${esc(e.message)}</p><p>Conserva en config.js la misma URL /exec que ya utiliza tu implementación.</p>`)}renderEqBatch();renderPeBatch();equipmentCertUI()}
+async function init(){document.title=cfg.APP_NAME||document.title;$('#fechaHoy').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$$('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',renderSeguimiento));$('#btnApplyFilters').onclick=renderSeguimiento;['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',renderMapa));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();$('#btnUnlockBuenas').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminBuenasPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la zona restringida.</p>')};$('#btnSaveBuena').onclick=disableDuring($('#btnSaveBuena'),saveBuenaPractica);$('#coAnio').value=new Date().getFullYear();$('#coMes').value=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][new Date().getMonth()];[['coFotos1','coPrev1'],['coFotos2','coPrev2'],['coFotos3','coPrev3']].forEach(([i,p])=>$('#'+i).onchange=()=>previewPhotos($('#'+i),$('#'+p)));$('#btnSaveControles').onclick=disableDuring($('#btnSaveControles'),saveControles);$('#coFiltroEmpresa').onchange=renderControles;$('#btnUnlockReview').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY){state.reviewUnlocked=true;$('#reviewLocked').classList.add('hidden');$('#reviewArea').classList.remove('hidden');renderReviewQueue()}else if(k)showModal('Clave incorrecta','<p>No se habilitó la revisión.</p>')};$('#btnRenderReview').onclick=renderReviewQueue;try{await refreshData();await reloadMap()}catch(e){showModal('Falta conectar el backend',`<p>${esc(e.message)}</p><p>Conserva en config.js la misma URL /exec que ya utiliza tu implementación.</p>`)}renderEqBatch();renderPeBatch();equipmentCertUI()}
 init();
