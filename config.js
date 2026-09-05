@@ -1,8 +1,8 @@
 window.APP_CONFIG = {
-  // URL /exec del Web App de Google Apps Script.
-  API_URL: "https://script.google.com/macros/s/AKfycbzb9dyxR-YMMIl9L_aYaHS8MCdXiaB7D88Jv7Es9ZK5YfwN_imAYhKM75MQGzAcw7jS/exec",
+  // Pega aquí la URL /exec de tu implementación actual de Google Apps Script.
+  API_URL: "PEGA_AQUI_TU_URL_DE_APPS_SCRIPT",
   APP_NAME: "Gestión de Izaje Mecánico de Cargas",
-  DEFAULT_COMPANY: "UNACEM",
   MAP_IMAGE_URL: "assets/mapa_planta_nueva.png",
-  STANDARD_URL: ""
+  STANDARD_URL: "assets/DSHIU-S-006.pdf",
+  ADMIN_KEY: "Unacem2026"
 };
