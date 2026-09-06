@@ -2,10 +2,9 @@
 const cfg=window.APP_CONFIG||{}, $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 Chart.register(ChartDataLabels);
 const CATS=[
-'Almacenamiento de equipos',
+'Safety Start IMC',
 'Modelo de Plan de Izaje Crítico',
 'Cálculo de Tensiones',
-'Manual y tabla de cargas de la Grúa UNACEM - GRÚA GROVE TMS875B',
 'Izajes Repetitivos críticos con Grúas fijas',
 'Lecciones Aprendidas',
 'Otras buenas prácticas'
@@ -125,28 +124,52 @@ async function reloadMap(){
 function renderMapa(){const emp=$('#mapEmpresa')?.value||'',st=$('#mapEstado')?.value||'',q=norm($('#mapSearch')?.value||'');const arr=(state.mapData||[]).filter(x=>(!emp||x.empresa===emp)&&(!st||x.estado===st)&&(!q||norm(JSON.stringify(x)).includes(q)));const mk=$('#mapMarkers');if(!mk)return;mk.innerHTML='';groupMapBySector(arr).forEach(g=>{const wrap=document.createElement('div');wrap.className='sector-map-marker';wrap.style.left=`${g.x}%`;wrap.style.top=`${g.y}%`;const btn=document.createElement('button');btn.className=`marker ${groupMarkerState(g)}`;btn.type='button';btn.textContent=String(g.items.length);btn.title=`${g.sector}: ${g.items.length} trabajo(s)`;btn.onclick=e=>{e.stopPropagation();showMarkerGroup(g,wrap)};const lab=document.createElement('span');lab.className='sector-map-label';lab.textContent=g.sector;wrap.append(btn,lab);mk.appendChild(wrap)});$('#mapKpis').innerHTML=[['Trabajos',arr.length],['Empresas',new Set(arr.map(x=>x.empresa)).size],['En ejecución',arr.filter(x=>norm(x.estado).includes('ejec')).length]].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div></div>`).join('');drawChart('chartMapEmpresas','bar',countBy(arr,'empresa'),'mapEmp',false);$('#mapList').innerHTML=tableSimple(arr,['empresa','sector','actividad','estado'],['Empresa','Sector','Actividad','Estado']);requestAnimationFrame(syncMapOverlays)}
 function showMarkerGroup(g,wrap){$$('.marker-card').forEach(e=>e.remove());const c=document.createElement('div');c.className='marker-card';const left=Math.max(5,Math.min(92,g.x+2)),top=Math.max(5,Math.min(88,g.y+2));c.style.left=`${left}%`;c.style.top=`${top}%`;const companies=[...new Set(g.items.map(x=>x.empresa).filter(Boolean))];c.innerHTML=`<b>${esc(g.sector)}</b><br><b>${g.items.length} trabajo(s)</b><br>Empresa(s): ${esc(companies.join(', '))}<hr>${g.items.slice(0,4).map(x=>`${esc(x.actividad||'Trabajo de izaje')} · ${esc(x.estado||'')}`).join('<br>')}${g.items.length>4?`<br>+ ${g.items.length-4} más`:''}`;$('#mapMarkers').appendChild(c);setTimeout(()=>c.remove(),9000)}
 
+
 const previewCache=new Map();
+let pdfJsModulePromise=null;
+async function getPdfJs(){
+  if(pdfJsModulePromise)return pdfJsModulePromise;
+  pdfJsModulePromise=import(window.PDFJS_CDN).then(mod=>{
+    mod.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.mjs";
+    return mod;
+  });
+  return pdfJsModulePromise;
+}
 async function fetchDrivePreview(url){
-  if(!url)return'';
+  if(!url)return null;
   if(previewCache.has(url))return previewCache.get(url);
-  const p=api('getDrivePreview',{url}).then(d=>d?.dataUrl||'').catch(()=> '');
-  previewCache.set(url,p);
-  return p;
+  const q=api('getDrivePreview',{url}).then(d=>d||null).catch(()=>null);
+  previewCache.set(url,q);return q;
+}
+function dataUrlToUint8(dataUrl){
+  const b64=String(dataUrl||'').split(',')[1]||'',bin=atob(b64),arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  return arr;
+}
+async function renderPdfFirstPage(target,dataUrl){
+  const pdfjs=await getPdfJs(),pdf=await pdfjs.getDocument({data:dataUrlToUint8(dataUrl)}).promise,page=await pdf.getPage(1);
+  const base=page.getViewport({scale:1}),desired=Math.min(Math.max(target.clientWidth||700,320),1100),vp=page.getViewport({scale:desired/base.width});
+  const canvas=document.createElement('canvas');canvas.className='pdf-first-page';
+  canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);
+  await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+  target.innerHTML='';target.appendChild(canvas);
+}
+async function renderPracticePreviewInto(target,url){
+  if(!target||!url)return;
+  const d=await fetchDrivePreview(url);
+  if(!d?.dataUrl){target.innerHTML='<div class="pdf-tile">Vista previa no disponible. Usa Abrir / descargar.</div>';return}
+  if(/^image\//i.test(d.mimeType||'')){target.innerHTML=`<img src="${d.dataUrl}" alt="Vista previa" loading="lazy">`;return}
+  if((d.mimeType||'').toLowerCase()==='application/pdf'){
+    target.innerHTML='<div class="preview-loading">Generando portada del PDF…</div>';
+    try{await renderPdfFirstPage(target,d.dataUrl)}catch(e){target.innerHTML='<div class="pdf-tile">No se pudo generar la portada del PDF. Usa Abrir / descargar.</div>'}
+    return;
+  }
+  target.innerHTML='<div class="pdf-tile">Formato sin vista previa. Usa Abrir / descargar.</div>';
 }
 function practicePreview(url,id=''){
-  const u=String(url||'');
-  if(!u)return'<div class="pdf-tile">Sin imagen cargada</div>';
+  const u=String(url||'');if(!u)return'<div class="pdf-tile">Sin archivo cargado</div>';
   const token='bpimg_'+String(id||Math.random()).replace(/[^\w-]/g,'');
-  setTimeout(async()=>{
-    const el=document.getElementById(token);
-    if(!el)return;
-    const data=await fetchDrivePreview(u);
-    if(data){
-      el.innerHTML=`<img src="${data}" alt="Vista previa" loading="lazy">`;
-    }else{
-      el.innerHTML='<div class="pdf-tile">Vista previa no disponible. Usa Abrir / descargar.</div>';
-    }
-  },0);
+  setTimeout(()=>{const el=document.getElementById(token);if(el)renderPracticePreviewInto(el,u)},0);
   return `<div id="${token}" class="preview-loading">Cargando vista previa…</div>`;
 }
 function renderBuenas(){
@@ -165,10 +188,8 @@ function bestCardHtml(x){
 window.viewBestPractice=async id=>{
   const x=(state.buenas||[]).find(r=>r.id===id);if(!x)return;
   const u=parseUrls(x.archivoUrl||[])[0]||x.archivoUrl||'';
-  showModal(x.titulo,`<div id="practiceModalPreview" class="practice-modal-scroll"><div class="preview-loading">Cargando imagen…</div></div><p>${esc(x.detalle||'')}</p>${u?`<a class="btn primary" href="${esc(u)}" target="_blank">Abrir / descargar archivo</a>`:''}`);
-  const data=await fetchDrivePreview(u);
-  const root=$('#practiceModalPreview');
-  if(root)root.innerHTML=data?`<img src="${data}" alt="${esc(x.titulo)}">`:'<div class="notice">No fue posible generar la vista previa. Usa “Abrir / descargar archivo”.</div>';
+  showModal(x.titulo,`<div id="practiceModalPreview" class="practice-modal-scroll"><div class="preview-loading">Cargando vista previa…</div></div><p>${esc(x.detalle||'')}</p>${u?`<a class="btn primary" href="${esc(u)}" target="_blank">Abrir / descargar archivo</a>`:''}`);
+  const root=$('#practiceModalPreview');if(root)await renderPracticePreviewInto(root,u);
 }
 function renderAdminBuenasList(){
   const root=$('#adminBuenasList');if(!root)return;

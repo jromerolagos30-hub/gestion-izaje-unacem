@@ -131,3 +131,12 @@
   .sector-map-label{max-width:64px;font-size:6px;padding:1px 2px}
   .home-sector-map-marker .marker{width:16px;height:16px;font-size:7px}
 }
+
+/* V4.3 - edición discreta al final + portada de PDF */
+.practice-editor-access{margin:18px 0 2px;padding:18px;border:1px dashed #cfd8df;background:#f8fafb;border-radius:14px;text-align:center}
+.practice-editor-access p{margin:8px 0 0;color:var(--muted);font-size:12px}
+.editor-access-btn{min-width:320px}
+.pdf-first-page{display:block;width:100%;height:auto;max-width:100%;background:#fff;border-radius:8px}
+.best-preview .pdf-first-page{width:100%;height:auto;max-height:100%;object-fit:contain}
+.practice-modal-scroll .pdf-first-page{width:100%;height:auto;max-height:none}
+@media(max-width:700px){.editor-access-btn{width:100%;min-width:0}.practice-editor-access{padding:14px}.best-preview .pdf-first-page{max-height:none}}
