@@ -140,3 +140,50 @@
 .best-preview .pdf-first-page{width:100%;height:auto;max-height:100%;object-fit:contain}
 .practice-modal-scroll .pdf-first-page{width:100%;height:auto;max-height:none}
 @media(max-width:700px){.editor-access-btn{width:100%;min-width:0}.practice-editor-access{padding:14px}.best-preview .pdf-first-page{max-height:none}}
+
+
+/* V4.4 - portada universal para cualquier PDF de Buenas Prácticas */
+.pdf-drive-thumbnail,
+.pdf-first-page{
+  display:block;
+  width:100%;
+  height:100%;
+  max-width:100%;
+  object-fit:contain;
+  background:#fff;
+  border-radius:8px;
+}
+.best-preview{
+  background:#fff!important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.best-preview .pdf-drive-thumbnail,
+.best-preview .pdf-first-page{
+  width:100%!important;
+  height:100%!important;
+  object-fit:contain!important;
+}
+.practice-modal-scroll .pdf-drive-thumbnail,
+.practice-modal-scroll .pdf-first-page{
+  display:block;
+  width:100%!important;
+  height:auto!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  background:#fff;
+}
+@media(max-width:700px){
+  .best-preview{
+    min-height:420px;
+    height:auto!important;
+  }
+  .best-preview .pdf-drive-thumbnail,
+  .best-preview .pdf-first-page{
+    min-height:360px;
+    height:auto!important;
+    max-height:70vh!important;
+  }
+}

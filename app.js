@@ -125,6 +125,34 @@ function renderMapa(){const emp=$('#mapEmpresa')?.value||'',st=$('#mapEstado')?.
 function showMarkerGroup(g,wrap){$$('.marker-card').forEach(e=>e.remove());const c=document.createElement('div');c.className='marker-card';const left=Math.max(5,Math.min(92,g.x+2)),top=Math.max(5,Math.min(88,g.y+2));c.style.left=`${left}%`;c.style.top=`${top}%`;const companies=[...new Set(g.items.map(x=>x.empresa).filter(Boolean))];c.innerHTML=`<b>${esc(g.sector)}</b><br><b>${g.items.length} trabajo(s)</b><br>Empresa(s): ${esc(companies.join(', '))}<hr>${g.items.slice(0,4).map(x=>`${esc(x.actividad||'Trabajo de izaje')} · ${esc(x.estado||'')}`).join('<br>')}${g.items.length>4?`<br>+ ${g.items.length-4} más`:''}`;$('#mapMarkers').appendChild(c);setTimeout(()=>c.remove(),9000)}
 
 
+
+function driveThumbnailUrl(url,size=1600){
+  const id=driveId(url);
+  return id?`https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${size}`:'';
+}
+function loadImgUrl(url,timeout=9000){
+  return new Promise((resolve,reject)=>{
+    if(!url)return reject(new Error('URL vacía'));
+    const img=new Image();
+    const t=setTimeout(()=>{img.src='';reject(new Error('Tiempo de espera agotado'))},timeout);
+    img.onload=()=>{clearTimeout(t);resolve(img)};
+    img.onerror=()=>{clearTimeout(t);reject(new Error('No se pudo cargar la imagen'))};
+    img.referrerPolicy='no-referrer';
+    img.src=url;
+  });
+}
+async function renderDriveThumbnail(target,url){
+  const thumb=driveThumbnailUrl(url,1800);
+  if(!thumb)return false;
+  try{
+    await loadImgUrl(thumb);
+    target.innerHTML=`<img class="pdf-first-page pdf-drive-thumbnail" src="${thumb}" alt="Primera página del PDF">`;
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
 const previewCache=new Map();
 let pdfJsModulePromise=null;
 async function getPdfJs(){
@@ -150,20 +178,52 @@ async function renderPdfFirstPage(target,dataUrl){
   const pdfjs=await getPdfJs(),pdf=await pdfjs.getDocument({data:dataUrlToUint8(dataUrl)}).promise,page=await pdf.getPage(1);
   const base=page.getViewport({scale:1}),desired=Math.min(Math.max(target.clientWidth||700,320),1100),vp=page.getViewport({scale:desired/base.width});
   const canvas=document.createElement('canvas');canvas.className='pdf-first-page';
-  canvas.width=Math.ceil(vp.width);canvas.height=Math.ceil(vp.height);
-  await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  canvas.width=Math.ceil(vp.width*dpr);canvas.height=Math.ceil(vp.height*dpr);
+  canvas.style.width=Math.ceil(vp.width)+'px';canvas.style.height=Math.ceil(vp.height)+'px';
+  const ctx=canvas.getContext('2d',{alpha:false});
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  await page.render({canvasContext:ctx,viewport:vp,transform:[dpr,0,0,dpr,0,0]}).promise;
   target.innerHTML='';target.appendChild(canvas);
 }
 async function renderPracticePreviewInto(target,url){
   if(!target||!url)return;
+  target.innerHTML='<div class="preview-loading">Cargando vista previa…</div>';
+
+  // 1) Para archivos de Google Drive, intentar primero el thumbnail nativo.
+  // Drive genera la miniatura de la primera página incluso para PDFs grandes.
+  if(driveId(url)){
+    const ok=await renderDriveThumbnail(target,url);
+    if(ok)return;
+  }
+
+  // 2) Respaldo: solicitar los bytes al Apps Script y renderizar con PDF.js.
   const d=await fetchDrivePreview(url);
-  if(!d?.dataUrl){target.innerHTML='<div class="pdf-tile">Vista previa no disponible. Usa Abrir / descargar.</div>';return}
-  if(/^image\//i.test(d.mimeType||'')){target.innerHTML=`<img src="${d.dataUrl}" alt="Vista previa" loading="lazy">`;return}
-  if((d.mimeType||'').toLowerCase()==='application/pdf'){
-    target.innerHTML='<div class="preview-loading">Generando portada del PDF…</div>';
-    try{await renderPdfFirstPage(target,d.dataUrl)}catch(e){target.innerHTML='<div class="pdf-tile">No se pudo generar la portada del PDF. Usa Abrir / descargar.</div>'}
+  if(!d?.dataUrl){
+    target.innerHTML='<div class="pdf-tile">Vista previa no disponible. Usa Abrir / descargar.</div>';
     return;
   }
+
+  if(/^image\//i.test(d.mimeType||'')){
+    target.innerHTML=`<img src="${d.dataUrl}" alt="Vista previa" loading="lazy">`;
+    return;
+  }
+
+  if((d.mimeType||'').toLowerCase()==='application/pdf'){
+    target.innerHTML='<div class="preview-loading">Generando portada del PDF…</div>';
+    try{
+      await renderPdfFirstPage(target,d.dataUrl);
+      return;
+    }catch(e){
+      // 3) Último intento: thumbnail de Drive nuevamente.
+      const ok=await renderDriveThumbnail(target,url);
+      if(ok)return;
+      console.warn('No se pudo generar portada PDF',e);
+      target.innerHTML='<div class="pdf-tile">No se pudo generar la portada del PDF. Usa Abrir / descargar.</div>';
+      return;
+    }
+  }
+
   target.innerHTML='<div class="pdf-tile">Formato sin vista previa. Usa Abrir / descargar.</div>';
 }
 function practicePreview(url,id=''){
