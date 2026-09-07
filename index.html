@@ -25,6 +25,7 @@
     <button class="nav-item" data-view="seguimiento"><span class="ico">▥</span><span>Estatus de Competencias y Equipos</span></button>
     <button class="nav-item" data-view="mapa"><span class="ico">⌖</span><span>Plano Interactivo</span></button>
     <button class="nav-item" data-view="buenas"><span class="ico">☑</span><span>Buenas Prácticas y Controles</span></button>
+    <button class="nav-item" data-view="asistente"><span class="ico">✦</span><span>Asistente IA de Izaje</span></button>
     <button class="nav-item" data-view="controles"><span class="ico">▣</span><span>Controles Operacionales</span></button>
     <button class="nav-item" data-view="revision"><span class="ico">✓</span><span>Revisión UNACEM</span></button>
   </nav>
@@ -51,6 +52,7 @@
     <button class="quick-card" data-go="seguimiento"><span>▥</span><b>Estatus de Competencias y Equipos</b><small>Seguimiento, observaciones y masters PDF.</small></button>
     <button class="quick-card" data-go="mapa"><span>⌖</span><b>Trabajos de Izaje en Tiempo Real</b><small>Mapa interactivo de Planta Atocongo.</small></button>
     <button class="quick-card" data-go="buenas"><span>☑</span><b>Buenas Prácticas y Controles del Estándar IMC</b><small>Material técnico comunicado por UNACEM.</small></button>
+    <button class="quick-card ai-quick-card" data-go="asistente"><span>✦</span><b>Asistente IA de Izaje</b><small>Consulta requisitos y criterios sustentados en documentos UNACEM.</small></button>
     <button class="quick-card" data-go="controles"><span>▣</span><b>Controles Operacionales</b><small>Evidencias mensuales por empresa.</small></button>
     <button class="quick-card" data-go="revision"><span>✓</span><b>Revisión UNACEM</b><small>Validación de equipos y competencias.</small></button>
   </div>
@@ -173,6 +175,47 @@
     <button id="btnSaveBuena" class="btn primary">Guardar Buena Práctica / Control</button>
     <div class="panel-head admin-material-head"><h3>Materiales cargados</h3><span class="pill neutral">Editar / eliminar</span></div>
     <div id="adminBuenasList"></div>
+  </div>
+</section>
+
+
+<section id="view-asistente" class="view">
+  <div class="section-title ai-section-title">
+    <div><h2>Asistente IA de Izaje Mecánico de Cargas</h2><p>Realiza consultas técnicas y recibe respuestas sustentadas en el repositorio documental de Izaje UNACEM.</p></div>
+    <span class="ai-online-badge"><i></i> IA documental</span>
+  </div>
+  <div class="ai-layout">
+    <aside class="ai-info panel">
+      <div class="ai-symbol">✦</div>
+      <h3>Consulta con sustento documental</h3>
+      <p>El asistente busca primero en los documentos indexados antes de responder.</p>
+      <div class="ai-rule"><b>✓ Respuestas trazables</b><span>Incluye la fuente documental utilizada.</span></div>
+      <div class="ai-rule"><b>✓ Enfoque UNACEM</b><span>Prioriza estándares, formatos, guías y procedimientos cargados.</span></div>
+      <div class="ai-rule"><b>✓ Lenguaje práctico</b><span>Explicaciones claras para supervisores, riggers, operadores y trabajadores.</span></div>
+      <div class="ai-disclaimer">La respuesta es una ayuda de consulta. Ante discrepancias, prevalece el documento oficial vigente.</div>
+    </aside>
+    <div class="ai-chat panel">
+      <div class="ai-chat-head">
+        <div><span class="ai-avatar">✦</span><div><b>Asistente IA de Izaje</b><small>Basado en el repositorio documental UNACEM</small></div></div>
+        <button id="btnClearChat" class="btn secondary ai-clear-btn" type="button">Limpiar chat</button>
+      </div>
+      <div id="aiMessages" class="ai-messages" aria-live="polite">
+        <div class="ai-message assistant">
+          <div class="ai-msg-avatar">✦</div>
+          <div class="ai-bubble"><b>Hola, soy tu Asistente IA de Izaje.</b><p>Puedes preguntarme sobre izajes críticos, competencias del rigger, inspecciones, permisos, grúas, tecles, tirfor, accesorios y otros requisitos disponibles en el repositorio.</p></div>
+        </div>
+      </div>
+      <div class="ai-suggestions">
+        <button type="button" data-ai-question="¿Cuándo un izaje se considera crítico?">¿Cuándo un izaje es crítico?</button>
+        <button type="button" data-ai-question="¿Qué requisitos debe cumplir un rigger?">Requisitos de un rigger</button>
+        <button type="button" data-ai-question="¿Qué inspecciones deben realizarse a los equipos y accesorios de izaje?">Inspecciones de equipos</button>
+      </div>
+      <div class="ai-compose">
+        <textarea id="aiQuestion" rows="2" maxlength="1500" placeholder="Escribe tu consulta sobre izaje mecánico de cargas..."></textarea>
+        <button id="btnSendAI" class="btn primary ai-send-btn" type="button"><span>Enviar</span><b>➤</b></button>
+      </div>
+      <div id="aiStatus" class="ai-status">Las respuestas se generan a partir de la documentación disponible.</div>
+    </div>
   </div>
 </section>
 
