@@ -221,31 +221,47 @@
   <div class="section-title">
     <div>
       <h2>Asistente IA de Izaje</h2>
-      <p>Consulta técnica soportada en el Estándar IMC de UNACEM PERÚ y documentos relacionados.</p>
+      <p>Consulta con sustento en el Estándar IMC de UNACEM PERÚ y documentos relacionados.</p>
     </div>
-    <span class="pill">IA · IMC</span>
+    <span class="pill assistant-doc-pill">IA documental</span>
   </div>
 
-  <div class="assistant-layout">
-    <div class="panel assistant-main-card">
+  <div class="assistant-embedded-layout">
+    <div class="panel assistant-info-card">
       <div class="assistant-icon">✦</div>
-      <div class="assistant-copy">
-        <h3>Asistente IA de Izaje</h3>
-        <p>Accede al asistente para realizar consultas relacionadas con izaje mecánico de cargas y revisar respuestas sustentadas en la documentación técnica de referencia de UNACEM.</p>
+      <h3>Consulta con sustento documental</h3>
+      <p>El asistente busca primero en los documentos indexados antes de responder.</p>
+      <div class="assistant-benefits">
+        <div><b>✓ Respuestas trazables</b><span>Incluye la fuente documental utilizada.</span></div>
+        <div><b>✓ Enfoque UNACEM</b><span>Prioriza estándares, formatos, guías y procedimientos cargados.</span></div>
+        <div><b>✓ Lenguaje práctico</b><span>Explicaciones claras para supervisores, riggers, operadores y trabajadores.</span></div>
       </div>
-      <button id="btnOpenAssistantIA" class="btn primary assistant-open-btn">Abrir Asistente IA</button>
+      <div class="assistant-warning">La respuesta es una ayuda de consulta. Ante discrepancias, prevalece el documento oficial vigente.</div>
+      <div class="assistant-source-row assistant-source-inline">
+        <div class="assistant-doc-icon">▤</div>
+        <div><b>DSHIU-S-006</b><span>Estándar de Izaje Mecánico de Cargas</span></div>
+      </div>
     </div>
 
-    <div class="panel assistant-source-card">
-      <h3>Fuente principal de consulta</h3>
-      <div class="assistant-source-row">
-        <div class="assistant-doc-icon">▤</div>
-        <div>
-          <b>DSHIU-S-006</b>
-          <span>Estándar de Izaje Mecánico de Cargas</span>
-        </div>
+    <div class="panel assistant-chat-card">
+      <div class="assistant-chat-head">
+        <div><h3>Asistente IA de Izaje</h3><span>Basado en el repositorio documental UNACEM</span></div>
+        <button id="btnClearAssistant" class="btn secondary assistant-clear-btn" type="button">Limpiar</button>
       </div>
-      <p class="assistant-note">El asistente debe utilizarse como apoyo para la consulta. La versión vigente del estándar y los documentos oficiales continúan siendo la referencia aplicable.</p>
+      <div id="assistantMessages" class="assistant-messages" aria-live="polite">
+        <div class="assistant-message bot"><div class="assistant-avatar">✦</div><div class="assistant-bubble">Hola, soy tu Asistente IA de Izaje.<br>Puedes preguntarme sobre izajes críticos, competencias del rigger, inspecciones, permisos, grúas, tecles, tirfor, accesorios y otros requisitos disponibles en el repositorio.</div></div>
+      </div>
+      <div class="assistant-suggestions">
+        <button type="button" data-assistant-question="¿Cuándo un izaje es crítico?">¿Cuándo un izaje es crítico?</button>
+        <button type="button" data-assistant-question="¿Qué requisitos debe cumplir un rigger?">Requisitos de un rigger</button>
+        <button type="button" data-assistant-question="¿Qué debo verificar en la inspección de un tecle?">Inspección de tecles</button>
+        <button type="button" data-assistant-question="¿Qué requisitos debo cumplir para realizar izajes de noche?">Izaje nocturno</button>
+      </div>
+      <div class="assistant-compose">
+        <textarea id="assistantInput" rows="2" placeholder="Escribe tu consulta sobre izaje mecánico de cargas..."></textarea>
+        <button id="btnSendAssistant" class="assistant-send-btn" type="button" aria-label="Enviar consulta">➤</button>
+      </div>
+      <div id="assistantStatus" class="assistant-status">Las respuestas se generan a partir de la documentación disponible.</div>
     </div>
   </div>
 </section>
