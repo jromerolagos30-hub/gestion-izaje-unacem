@@ -1,6 +1,6 @@
 
 const cfg=window.APP_CONFIG||{}, $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const ASSISTANT_IA_URL=cfg.ASSISTANT_IA_URL||'';
+const ASSISTANT_WEBHOOK_URL='https://jonathanrl.app.n8n.cloud/webhook/chatbot-sst-docs';
 Chart.register(ChartDataLabels);
 const DIFFUSION_CATS=['Buenas Prácticas UNACEM PERÚ','Lecciones Aprendidas'];
 const OPERATIONAL_CATS=[
@@ -19,13 +19,39 @@ const addYears=(v,n)=>{if(!v)return'';const d=new Date(v+'T12:00:00');d.setFullY
 function statusBadge(v){const n=norm(v);let c=n.includes('aprob')?'aprobado':n.includes('revision')?'revision':n.includes('observ')?'observado':n.includes('operativo')?'operativo':n.includes('inoper')?'inoperativo':n.includes('fuera')?'fuera':n.includes('cumpl')?'cumplido':n.includes('venc')?'vencido':'';return `<span class="status ${c}">${esc(v||'')}</span>`}
 async function api(action,payload={}){if(!cfg.API_URL||cfg.API_URL.includes('PEGA_AQUI'))throw new Error('Configura API_URL en config.js con tu URL /exec de Apps Script.');const r=await fetch(cfg.API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...payload})});const j=await r.json();if(!j.ok)throw new Error(j.error||'Error del servidor');return j.data}
 function go(view){$$('.view').forEach(x=>x.classList.remove('active'));$('#view-'+view)?.classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));if(view==='equipos')renderEquiposStats();if(view==='personal')renderPersonalStats();if(view==='seguimiento')renderSeguimiento();if(view==='mapa')renderMapa();if(view==='difusion')renderDifusion();if(view==='controles'){renderOperationalMaterials();renderControles();}if(view==='revision'&&state.reviewUnlocked)renderReviewQueue();window.scrollTo({top:0,behavior:'smooth'})}
-function openAssistantIA(){
-  const url=String(ASSISTANT_IA_URL||'').trim();
-  if(!url){
-    showModal('Asistente IA de Izaje',`<p>El módulo del Asistente IA ya está restaurado en la aplicación.</p><p>Falta asociar la URL del asistente que utilizabas anteriormente en <b>ASSISTANT_IA_URL</b>.</p>`);
-    return;
-  }
-  window.open(url,'_blank','noopener,noreferrer');
+function assistantEndpoint(){
+  return ASSISTANT_WEBHOOK_URL;
+}
+function setAssistantStatus(text,isError=false){const el=$('#assistantStatus');if(el){el.textContent=text;el.classList.toggle('error',!!isError)}}
+function appendAssistantMessage(role,text){
+  const root=$('#assistantMessages');if(!root)return;
+  const row=document.createElement('div');row.className=`assistant-message ${role==='user'?'user':'bot'}`;
+  if(role!=='user'){const av=document.createElement('div');av.className='assistant-avatar';av.textContent='✦';row.appendChild(av)}
+  const bubble=document.createElement('div');bubble.className='assistant-bubble';bubble.textContent=String(text||'');row.appendChild(bubble);root.appendChild(row);root.scrollTop=root.scrollHeight;
+}
+function clearAssistantChat(){
+  const root=$('#assistantMessages');if(!root)return;
+  root.innerHTML='<div class="assistant-message bot"><div class="assistant-avatar">✦</div><div class="assistant-bubble">Hola, soy tu Asistente IA de Izaje. Puedes preguntarme sobre izajes críticos, competencias del rigger, inspecciones, permisos, grúas, tecles, tirfor, accesorios y otros requisitos disponibles en el repositorio.</div></div>';
+  setAssistantStatus('Las respuestas se generan a partir de la documentación disponible.');
+}
+function configureAssistantEndpoint(){
+  return true;
+}
+async function sendAssistantQuestion(question){
+  const q=String(question||$('#assistantInput')?.value||'').trim();if(!q)return;
+  const endpoint=assistantEndpoint();
+  appendAssistantMessage('user',q);if($('#assistantInput'))$('#assistantInput').value='';
+  const btn=$('#btnSendAssistant');if(btn)btn.disabled=true;setAssistantStatus('Consultando el repositorio documental...');
+  const loadingId='assistant-loading-'+Date.now();
+  const root=$('#assistantMessages');if(root){const row=document.createElement('div');row.id=loadingId;row.className='assistant-message bot';row.innerHTML='<div class="assistant-avatar">✦</div><div class="assistant-bubble assistant-typing">Analizando documentos…</div>';root.appendChild(row);root.scrollTop=root.scrollHeight}
+  try{
+    const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatInput:q,message:q,question:q,source:'gestion-izaje-unacem'})});
+    const raw=await r.text();if(!r.ok)throw new Error(`HTTP ${r.status}: ${raw.slice(0,180)}`);
+    let answer=raw;try{const j=JSON.parse(raw);answer=j.output||j.answer||j.response||j.text||raw}catch(_){ }
+    $('#'+loadingId)?.remove();appendAssistantMessage('bot',answer||'No se recibió una respuesta del asistente.');setAssistantStatus('Respuesta generada con consulta al repositorio documental.');
+  }catch(e){
+    $('#'+loadingId)?.remove();appendAssistantMessage('bot','No fue posible consultar el asistente en este momento. Verifica la conexión del webhook de producción.');setAssistantStatus(e.message||'Error de conexión',true);
+  }finally{if(btn)btn.disabled=false}
 }
 function showModal(title,html){$('#modalContent').innerHTML=`<h2>${esc(title)}</h2>${html}`;$('#modal').classList.remove('hidden')}
 function closeModal(){$('#modal').classList.add('hidden')}
@@ -533,7 +559,7 @@ function renderReviewQueue(){if(!state.reviewUnlocked||!$('#reviewQueue'))return
 window.openReview=(type,id)=>{const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);if(!x)return;const options=(state.aprobadores||[]).map(a=>`<option>${esc(a.nombre)}</option>`).join('');showModal('Revisión UNACEM',`<div class="review-grid"><div>${recordDetailHtml(x)}</div><div><label>Revisor UNACEM*<select id="reviewerName"><option value="">Seleccionar</option>${options}</select></label><label>Resultado*<select id="reviewStatus"><option value="Aprobado">Aprobado</option><option value="Observado">Observado</option></select></label><label>Comentarios<textarea id="reviewComment" rows="6" placeholder="Obligatorio si el estado es Observado"></textarea></label><button id="btnSubmitReview" class="btn primary full" onclick="submitInAppReview('${type}','${id}')">Guardar revisión</button></div></div>`)}
 window.submitInAppReview=async(type,id)=>{const btn=$('#btnSubmitReview');if(btn.disabled)return;const reviewer=$('#reviewerName').value,status=$('#reviewStatus').value,comment=$('#reviewComment').value.trim();if(!reviewer)return alert('Selecciona tu nombre de la lista.');if(status==='Observado'&&!comment)return alert('Debes ingresar comentarios cuando el registro es Observado.');btn.disabled=true;try{await api('reviewRecord',{type,id,reviewer,status,comment});closeModal();await refreshData();showModal('Revisión guardada',`<p>El registro quedó <b>${esc(status)}</b>.</p>`)}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}}
 async function init(){document.title=cfg.APP_NAME||document.title;$('#fechaHoy').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$$('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
-$('#btnOpenAssistantIA')?.addEventListener('click',openAssistantIA);$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearStatusChartSelection();renderSeguimiento()}));$('#btnApplyFilters').onclick=()=>{clearStatusChartSelection();renderSeguimiento()};['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearMapSelection();renderMapa()}));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();window.addEventListener('resize',()=>requestAnimationFrame(syncMapOverlays));document.addEventListener('fullscreenchange',()=>setTimeout(syncMapOverlays,80));$('#plantMapImg')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('.home-map-preview img')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('#btnUnlockDifusion').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminDifusionPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
+$('#btnSendAssistant')?.addEventListener('click',()=>sendAssistantQuestion());$('#btnClearAssistant')?.addEventListener('click',clearAssistantChat);$$('[data-assistant-question]').forEach(b=>b.addEventListener('click',()=>sendAssistantQuestion(b.dataset.assistantQuestion)));$('#assistantInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAssistantQuestion()}});$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearStatusChartSelection();renderSeguimiento()}));$('#btnApplyFilters').onclick=()=>{clearStatusChartSelection();renderSeguimiento()};['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearMapSelection();renderMapa()}));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();window.addEventListener('resize',()=>requestAnimationFrame(syncMapOverlays));document.addEventListener('fullscreenchange',()=>setTimeout(syncMapOverlays,80));$('#plantMapImg')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('.home-map-preview img')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('#btnUnlockDifusion').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminDifusionPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
 $('#btnUnlockOperacionales').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminOperacionalesPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
 $('#btnSaveDifusionMaterial').onclick=disableDuring($('#btnSaveDifusionMaterial'),()=>saveMaterialFromPanel('difusion'));
 $('#btnSaveOperacionalMaterial').onclick=disableDuring($('#btnSaveOperacionalMaterial'),()=>saveMaterialFromPanel('operacional'));
