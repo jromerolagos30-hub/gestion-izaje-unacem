@@ -25,6 +25,7 @@
     <button class="nav-item" data-view="seguimiento"><span class="ico">▥</span><span>Estatus de Competencias y Equipos</span></button>
     <button class="nav-item" data-view="mapa"><span class="ico">⌖</span><span>Plano Interactivo</span></button>
     <button class="nav-item" data-view="difusion"><span class="ico">▤</span><span>Difusión IMC</span></button>
+    <button class="nav-item" data-view="asistente"><span class="ico">✦</span><span>Asistente IA de Izaje</span></button>
     <button class="nav-item" data-view="controles"><span class="ico">▣</span><span>Controles Operacionales</span></button>
     <button class="nav-item" data-view="revision"><span class="ico">✓</span><span>Revisión UNACEM</span></button>
   </nav>
@@ -51,6 +52,7 @@
     <button class="quick-card" data-go="seguimiento"><span>▥</span><b>Estatus de Competencias y Equipos</b><small>Seguimiento, observaciones y masters PDF.</small></button>
     <button class="quick-card" data-go="mapa"><span>⌖</span><b>Trabajos de Izaje en Tiempo Real</b><small>Mapa interactivo de Planta Atocongo.</small></button>
     <button class="quick-card" data-go="difusion"><span>▤</span><b>Difusión IMC</b><small>Buenas Prácticas UNACEM PERÚ y Lecciones Aprendidas con trazabilidad.</small></button>
+    <button class="quick-card assistant-quick-card" data-go="asistente"><span>✦</span><b>Asistente IA de Izaje</b><small>Consultas sobre el Estándar IMC y documentos técnicos relacionados.</small></button>
     <button class="quick-card" data-go="controles"><span>▣</span><b>Controles Operacionales</b><small>Material técnico IMC y evidencias mensuales por empresa.</small></button>
     <button class="quick-card" data-go="revision"><span>✓</span><b>Revisión UNACEM</b><small>Validación de equipos y competencias.</small></button>
   </div>
@@ -211,6 +213,40 @@
     <button id="btnSaveDifusionMaterial" class="btn primary">Guardar material de difusión</button>
     <div class="panel-head admin-material-head"><h3>Materiales cargados</h3><span class="pill neutral">Editar / eliminar</span></div>
     <div id="adminDifusionList"></div>
+  </div>
+</section>
+
+
+<section id="view-asistente" class="view">
+  <div class="section-title">
+    <div>
+      <h2>Asistente IA de Izaje</h2>
+      <p>Consulta técnica soportada en el Estándar IMC de UNACEM PERÚ y documentos relacionados.</p>
+    </div>
+    <span class="pill">IA · IMC</span>
+  </div>
+
+  <div class="assistant-layout">
+    <div class="panel assistant-main-card">
+      <div class="assistant-icon">✦</div>
+      <div class="assistant-copy">
+        <h3>Asistente IA de Izaje</h3>
+        <p>Accede al asistente para realizar consultas relacionadas con izaje mecánico de cargas y revisar respuestas sustentadas en la documentación técnica de referencia de UNACEM.</p>
+      </div>
+      <button id="btnOpenAssistantIA" class="btn primary assistant-open-btn">Abrir Asistente IA</button>
+    </div>
+
+    <div class="panel assistant-source-card">
+      <h3>Fuente principal de consulta</h3>
+      <div class="assistant-source-row">
+        <div class="assistant-doc-icon">▤</div>
+        <div>
+          <b>DSHIU-S-006</b>
+          <span>Estándar de Izaje Mecánico de Cargas</span>
+        </div>
+      </div>
+      <p class="assistant-note">El asistente debe utilizarse como apoyo para la consulta. La versión vigente del estándar y los documentos oficiales continúan siendo la referencia aplicable.</p>
+    </div>
   </div>
 </section>
 

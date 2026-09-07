@@ -1,5 +1,6 @@
 
 const cfg=window.APP_CONFIG||{}, $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const ASSISTANT_IA_URL=cfg.ASSISTANT_IA_URL||'';
 Chart.register(ChartDataLabels);
 const DIFFUSION_CATS=['Buenas Prácticas UNACEM PERÚ','Lecciones Aprendidas'];
 const OPERATIONAL_CATS=[
@@ -10,7 +11,7 @@ const OPERATIONAL_CATS=[
 'Zona de Crecimiento - IMC',
 'Izajes Repetitivos críticos con Grúas fijas'
 ];
-const state={empresas:[],tipos:[],competencias:[],certificadoras:[],aprobadores:[],equipos:[],personal:[],buenas:[],controles:[],mapData:[],eqBatch:[],peBatch:[],charts:{},reviewUnlocked:false};
+const state={empresas:[],tipos:[],competencias:[],certificadoras:[],aprobadores:[],equipos:[],personal:[],buenas:[],controles:[],mapData:[],eqBatch:[],peBatch:[],charts:{},reviewUnlocked:false,statusChartSelection:{company:'',status:''}};
 const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 const norm=v=>String(v??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const fmtDate=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleDateString('es-PE')};
@@ -18,6 +19,14 @@ const addYears=(v,n)=>{if(!v)return'';const d=new Date(v+'T12:00:00');d.setFullY
 function statusBadge(v){const n=norm(v);let c=n.includes('aprob')?'aprobado':n.includes('revision')?'revision':n.includes('observ')?'observado':n.includes('operativo')?'operativo':n.includes('inoper')?'inoperativo':n.includes('fuera')?'fuera':n.includes('cumpl')?'cumplido':n.includes('venc')?'vencido':'';return `<span class="status ${c}">${esc(v||'')}</span>`}
 async function api(action,payload={}){if(!cfg.API_URL||cfg.API_URL.includes('PEGA_AQUI'))throw new Error('Configura API_URL en config.js con tu URL /exec de Apps Script.');const r=await fetch(cfg.API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...payload})});const j=await r.json();if(!j.ok)throw new Error(j.error||'Error del servidor');return j.data}
 function go(view){$$('.view').forEach(x=>x.classList.remove('active'));$('#view-'+view)?.classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));if(view==='equipos')renderEquiposStats();if(view==='personal')renderPersonalStats();if(view==='seguimiento')renderSeguimiento();if(view==='mapa')renderMapa();if(view==='difusion')renderDifusion();if(view==='controles'){renderOperationalMaterials();renderControles();}if(view==='revision'&&state.reviewUnlocked)renderReviewQueue();window.scrollTo({top:0,behavior:'smooth'})}
+function openAssistantIA(){
+  const url=String(ASSISTANT_IA_URL||'').trim();
+  if(!url){
+    showModal('Asistente IA de Izaje',`<p>El módulo del Asistente IA ya está restaurado en la aplicación.</p><p>Falta asociar la URL del asistente que utilizabas anteriormente en <b>ASSISTANT_IA_URL</b>.</p>`);
+    return;
+  }
+  window.open(url,'_blank','noopener,noreferrer');
+}
 function showModal(title,html){$('#modalContent').innerHTML=`<h2>${esc(title)}</h2>${html}`;$('#modal').classList.remove('hidden')}
 function closeModal(){$('#modal').classList.add('hidden')}
 function disableDuring(btn,fn){return async()=>{if(btn.disabled)return;btn.disabled=true;const old=btn.textContent;btn.textContent='Procesando...';try{await fn()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}finally{btn.disabled=false;btn.textContent=old}}}
@@ -27,12 +36,35 @@ function countBy(arr,key){const o={};arr.forEach(x=>{const k=x[key]||'Sin dato';
 function colors(n){return ['#ed1c24','#3ba0df','#22a05a','#f0ae22','#805ad5','#64748b','#e8793c','#0f766e'].slice(0,Math.max(1,n))}
 function drawChart(id,type,data,key,legend=true){const el=$('#'+id);if(!el)return;if(state.charts[key])state.charts[key].destroy();const labels=Object.keys(data),vals=Object.values(data);state.charts[key]=new Chart(el,{type,data:{labels,datasets:[{label:'Cantidad',data:vals,backgroundColor:colors(labels.length),borderWidth:type==='doughnut'?1:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:legend,position:'bottom'},datalabels:{color:type==='doughnut'?'#fff':'#263442',anchor:type==='bar'?'end':'center',align:type==='bar'?'top':'center',font:{weight:'700'},formatter:v=>v||''}},scales:type==='bar'?{y:{beginAtZero:true,ticks:{precision:0}}}:{}}})}
 const stackTotalsPlugin={id:'stackTotals',afterDatasetsDraw(chart){const{ctx,scales}=chart;if(!scales?.x||!scales?.y)return;ctx.save();ctx.fillStyle='#172536';ctx.font='700 12px Inter, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';chart.data.labels.forEach((_,i)=>{const total=chart.data.datasets.reduce((s,ds)=>s+(Number(ds.data[i])||0),0);if(!total)return;ctx.fillText(`Total ${total}`,scales.x.getPixelForValue(i),scales.y.getPixelForValue(total)-5)});ctx.restore()}};
-function applyStatusChartFilter(company,status,target){
-  const e=$('#fEmpresa'),s=$('#fEstado');
-  if(e)e.value=company||'';
-  if(s)s.value=status||'';
+
+function getStatusChartSelection(){
+  state.statusChartSelection=state.statusChartSelection||{company:'',status:''};
+  return state.statusChartSelection;
+}
+function clearStatusChartSelection(){
+  state.statusChartSelection={company:'',status:''};
+}
+function toggleStatusChartSelection(company,status,target){
+  const cur=getStatusChartSelection();
+  if(cur.company===company&&norm(cur.status)===norm(status)){
+    clearStatusChartSelection();
+  }else{
+    state.statusChartSelection={company,status};
+  }
   renderSeguimiento();
   setTimeout(()=>$('#'+target)?.scrollIntoView({behavior:'smooth',block:'start'}),100);
+}
+function manualStatusFilters(){
+  const emp=$('#fEmpresa')?.value||'',eq=$('#fEquipo')?.value||'',st=$('#fEstado')?.value||'',q=norm($('#fSearch')?.value||'');
+  return{
+    fe:(state.equipos||[]).filter(x=>(!emp||x.empresa===emp)&&(!eq||x.tipo===eq)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q))),
+    fp:(state.personal||[]).filter(x=>(!emp||x.empresa===emp)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q)))
+  };
+}
+function applyInteractiveStatusSelection(arr){
+  const sel=getStatusChartSelection();
+  if(!sel.company&&!sel.status)return arr;
+  return arr.filter(x=>(!sel.company||x.empresa===sel.company)&&(!sel.status||norm(x.estadoRevision)===norm(sel.status)));
 }
 function drawCompanyStatus(id,arr,key,targetTable){
   const el=$('#'+id);if(!el)return;
@@ -40,7 +72,15 @@ function drawCompanyStatus(id,arr,key,targetTable){
   const companies=[...new Set(arr.map(x=>x.empresa||'Sin empresa'))];
   const statuses=['Aprobado','En revisión','Observado'];
   const palette=['#22a05a','#f0ae22','#ed1c24'];
-  const datasets=statuses.map((s,i)=>({label:s,data:companies.map(c=>arr.filter(x=>(x.empresa||'Sin empresa')===c&&norm(x.estadoRevision)===norm(s)).length),backgroundColor:palette[i],borderColor:'#fff',borderWidth:1}));
+  const selectedColor='#172536';
+  const sel=getStatusChartSelection();
+  const datasets=statuses.map((s,i)=>({
+    label:s,
+    data:companies.map(c=>arr.filter(x=>(x.empresa||'Sin empresa')===c&&norm(x.estadoRevision)===norm(s)).length),
+    backgroundColor:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?selectedColor:palette[i]),
+    borderColor:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?'#172536':'#fff'),
+    borderWidth:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?3:1)
+  }));
   state.charts[key]=new Chart(el,{
     type:'bar',
     data:{labels:companies,datasets},
@@ -50,13 +90,17 @@ function drawCompanyStatus(id,arr,key,targetTable){
       onClick:(evt,elements,chart)=>{
         if(!elements.length)return;
         const hit=elements[0];
-        applyStatusChartFilter(chart.data.labels[hit.index],chart.data.datasets[hit.datasetIndex].label,targetTable);
+        toggleStatusChartSelection(
+          chart.data.labels[hit.index],
+          chart.data.datasets[hit.datasetIndex].label,
+          targetTable
+        );
       },
       onHover:(evt,elements)=>{if(evt.native?.target)evt.native.target.style.cursor=elements.length?'pointer':'default'},
       plugins:{
         legend:{position:'bottom',labels:{boxWidth:28,padding:14}},
         datalabels:{display:ctx=>Number(ctx.dataset.data[ctx.dataIndex])>0,color:'#fff',anchor:'center',align:'center',clamp:true,font:{weight:'800',size:13},textStrokeColor:'rgba(0,0,0,.22)',textStrokeWidth:2,formatter:v=>v>0?String(v):''},
-        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,footer:()=> 'Clic para filtrar la tabla'}}
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,footer:()=> 'Clic para filtrar las tablas · clic nuevamente para quitar filtro'}}
       },
       scales:{x:{stacked:true,ticks:{autoSkip:false,maxRotation:25,minRotation:0}},y:{stacked:true,beginAtZero:true,ticks:{precision:0,stepSize:1}}}
     }
@@ -80,8 +124,53 @@ async function addPersonal(){if(!$('#peEmpresa').value||!$('#peNombre').value||!
 function renderPeBatch(){$('#peBatchCount').textContent=`${state.peBatch.length} personas`;$('#peBatchTable').innerHTML=tableSimple(state.peBatch,['empresa','nombre','dni','capacitacion','fecha','vigencia'],['Empresa','Nombre','DNI','Competencia','Fecha','Vigencia'])}
 async function savePersonal(){if(!state.peBatch.length)return showModal('Sin registros','<p>Agrega al menos una competencia.</p>');const r=await api('savePersonal',{items:state.peBatch});state.peBatch=[];renderPeBatch();await refreshData();showModal('Registro enviado',`<p>Se registraron <b>${r.count}</b> competencias. La información quedó En revisión.</p>`)}
 function tableSimple(arr,keys,heads){return `<div class="table-wrap"><table class="data-table"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${arr.map(x=>`<tr>${keys.map(k=>`<td>${esc(x[k]||'')}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${heads.length}">Sin registros</td></tr>`}</tbody></table></div>`}
-function filtered(){const emp=$('#fEmpresa')?.value||'',eq=$('#fEquipo')?.value||'',st=$('#fEstado')?.value||'',q=norm($('#fSearch')?.value||'');return{fe:(state.equipos||[]).filter(x=>(!emp||x.empresa===emp)&&(!eq||x.tipo===eq)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q))),fp:(state.personal||[]).filter(x=>(!emp||x.empresa===emp)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q)))}}
-function renderSeguimiento(){const {fe,fp}=filtered();$('#trackKpis').innerHTML=[['Equipos',fe.length,'Inventario filtrado'],['Personal',fp.length,'Competencias filtradas'],['Aprobados',fe.filter(x=>norm(x.estadoRevision).includes('aprob')).length+fp.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',fe.filter(x=>norm(x.estadoRevision).includes('observ')).length+fp.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawCompanyStatus('chartEquiposEmpresaStatus',fe,'eqCompany','trackEquiposTable');drawCompanyStatus('chartPersonalEmpresaStatus',fp,'peCompany','trackPersonalTable');drawChart('chartTrackEquiposTipo','doughnut',countBy(fe,'tipo'),'trackEqType',true);drawChart('chartTrackPersonalCap','doughnut',countBy(fp,'capacitacion'),'trackPeCap',true);$('#trackEquiposTable').innerHTML=trackTable(fe,'equipo');$('#trackPersonalTable').innerHTML=trackTable(fp,'personal')}
+
+function filtered(){
+  const base=manualStatusFilters();
+  return{fe:applyInteractiveStatusSelection(base.fe),fp:applyInteractiveStatusSelection(base.fp)};
+}
+function renderSeguimiento(){
+  const base=manualStatusFilters();
+  const fe=applyInteractiveStatusSelection(base.fe),fp=applyInteractiveStatusSelection(base.fp);
+  const sel=getStatusChartSelection();
+
+  $('#trackKpis').innerHTML=[
+    ['Equipos',fe.length,'Inventario filtrado'],
+    ['Personal',fp.length,'Competencias filtradas'],
+    ['Aprobados',fe.filter(x=>norm(x.estadoRevision).includes('aprob')).length+fp.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],
+    ['Observados',fe.filter(x=>norm(x.estadoRevision).includes('observ')).length+fp.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']
+  ].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');
+
+  // Las gráficas conservan TODAS las barras de los filtros superiores.
+  drawCompanyStatus('chartEquiposEmpresaStatus',base.fe,'eqCompany','trackEquiposTable');
+  drawCompanyStatus('chartPersonalEmpresaStatus',base.fp,'peCompany','trackPersonalTable');
+
+  // Tablas y gráficos secundarios sí responden al clic interactivo.
+  drawChart('chartTrackEquiposTipo','doughnut',countBy(fe,'tipo'),'trackEqType',true);
+  drawChart('chartTrackPersonalCap','doughnut',countBy(fp,'capacitacion'),'trackPeCap',true);
+  $('#trackEquiposTable').innerHTML=trackTable(fe,'equipo');
+  $('#trackPersonalTable').innerHTML=trackTable(fp,'personal');
+
+  // Indicador de filtro por clic
+  const host=$('#trackKpis')?.parentElement;
+  let info=$('#statusChartSelectionInfo');
+  if(!info&&host){
+    info=document.createElement('div');
+    info.id='statusChartSelectionInfo';
+    info.className='status-chart-selection-info';
+    host.insertBefore(info,$('#trackKpis'));
+  }
+  if(info){
+    if(sel.company||sel.status){
+      info.innerHTML=`<span>Selección por gráfico: <b>${esc(sel.company)}</b> · <b>${esc(sel.status)}</b></span><button id="btnClearStatusChartSelection" class="link-btn">Quitar selección</button>`;
+      info.classList.add('active');
+      $('#btnClearStatusChartSelection')?.addEventListener('click',()=>{clearStatusChartSelection();renderSeguimiento()});
+    }else{
+      info.innerHTML='Haz clic en una barra para filtrar las tablas. La barra seleccionada se marcará en color oscuro; vuelve a hacer clic para deseleccionarla.';
+      info.classList.remove('active');
+    }
+  }
+}
 function trackTable(arr,type){const isEq=type==='equipo';const heads=isEq?['Empresa','Equipo','Serie','Capacidad','Certificadora','Vigencia','Estado','Observación','Acciones']:['Empresa','Nombre','DNI','Competencia','Fecha','Vigencia','Estado','Observación','Acciones'];return `<div class="table-wrap"><table class="data-table"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${arr.map(x=>`<tr>${isEq?`<td>${esc(x.empresa)}</td><td>${esc(x.tipo)}</td><td>${esc(x.serie)}</td><td>${esc(x.capacidad)}</td><td>${esc(x.certificadoraFinal||x.certificadora)}</td><td>${fmtDate(x.vigencia)}</td>`:`<td>${esc(x.empresa)}</td><td>${esc(x.nombre)}</td><td>${esc(x.dni)}</td><td>${esc(x.capacitacion)}</td><td>${fmtDate(x.fecha)}</td><td>${fmtDate(x.vigencia)}</td>`}<td>${statusBadge(x.estadoRevision)}</td><td>${esc(x.observacion||'')}</td><td><button class="link-btn" onclick="viewRecord('${type}','${x.id}')">Ver registro</button> <button class="link-btn" onclick="editRecord('${type}','${x.id}')">${norm(x.estadoRevision).includes('observ')?'Levantar observación':'Editar'}</button> <button class="link-btn" onclick="deleteRecord('${type}','${x.id}','${esc(x.empresa)}')">Eliminar</button></td></tr>`).join('')||`<tr><td colspan="9">Sin registros</td></tr>`}</tbody></table></div>`}
 function parseUrls(v){if(Array.isArray(v))return v;if(!v)return[];try{return JSON.parse(v)}catch(e){return String(v).split('|').filter(Boolean)}}
 function driveId(url){const s=String(url||'');const m=s.match(/\/d\/([\w-]+)/)||s.match(/[?&]id=([\w-]+)/);return m?m[1]:''}
@@ -443,7 +532,8 @@ window.viewControl=id=>{const x=(state.controles||[]).find(r=>r.id===id);if(!x)r
 function renderReviewQueue(){if(!state.reviewUnlocked||!$('#reviewQueue'))return;const type=$('#rvTipo')?.value||'',st=$('#rvEstado')?.value||'En revisión',emp=$('#rvEmpresa')?.value||'';let rows=[];(state.equipos||[]).forEach(x=>rows.push({...x,_type:'equipo'}));(state.personal||[]).forEach(x=>rows.push({...x,_type:'personal'}));rows=rows.filter(x=>(!type||x._type===type)&&(!st||x.estadoRevision===st)&&(!emp||x.empresa===emp));$('#reviewQueue').innerHTML=rows.map(x=>`<div class="review-card"><div class="panel-head"><div><b>${x._type==='equipo'?esc(x.tipo):esc(x.nombre)}</b><div style="color:var(--muted);font-size:12px">${esc(x.empresa)} · ${x._type==='equipo'?esc(x.serie):esc(x.dni)}</div></div>${statusBadge(x.estadoRevision)}</div><button class="btn secondary" onclick="openReview('${x._type}','${x.id}')">Ver registro y revisar</button></div>`).join('')||'<div class="notice">No hay registros con los filtros seleccionados.</div>'}
 window.openReview=(type,id)=>{const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);if(!x)return;const options=(state.aprobadores||[]).map(a=>`<option>${esc(a.nombre)}</option>`).join('');showModal('Revisión UNACEM',`<div class="review-grid"><div>${recordDetailHtml(x)}</div><div><label>Revisor UNACEM*<select id="reviewerName"><option value="">Seleccionar</option>${options}</select></label><label>Resultado*<select id="reviewStatus"><option value="Aprobado">Aprobado</option><option value="Observado">Observado</option></select></label><label>Comentarios<textarea id="reviewComment" rows="6" placeholder="Obligatorio si el estado es Observado"></textarea></label><button id="btnSubmitReview" class="btn primary full" onclick="submitInAppReview('${type}','${id}')">Guardar revisión</button></div></div>`)}
 window.submitInAppReview=async(type,id)=>{const btn=$('#btnSubmitReview');if(btn.disabled)return;const reviewer=$('#reviewerName').value,status=$('#reviewStatus').value,comment=$('#reviewComment').value.trim();if(!reviewer)return alert('Selecciona tu nombre de la lista.');if(status==='Observado'&&!comment)return alert('Debes ingresar comentarios cuando el registro es Observado.');btn.disabled=true;try{await api('reviewRecord',{type,id,reviewer,status,comment});closeModal();await refreshData();showModal('Revisión guardada',`<p>El registro quedó <b>${esc(status)}</b>.</p>`)}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}}
-async function init(){document.title=cfg.APP_NAME||document.title;$('#fechaHoy').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$$('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',renderSeguimiento));$('#btnApplyFilters').onclick=renderSeguimiento;['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearMapSelection();renderMapa()}));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();window.addEventListener('resize',()=>requestAnimationFrame(syncMapOverlays));document.addEventListener('fullscreenchange',()=>setTimeout(syncMapOverlays,80));$('#plantMapImg')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('.home-map-preview img')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('#btnUnlockDifusion').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminDifusionPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
+async function init(){document.title=cfg.APP_NAME||document.title;$('#fechaHoy').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$$('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
+$('#btnOpenAssistantIA')?.addEventListener('click',openAssistantIA);$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearStatusChartSelection();renderSeguimiento()}));$('#btnApplyFilters').onclick=()=>{clearStatusChartSelection();renderSeguimiento()};['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearMapSelection();renderMapa()}));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();window.addEventListener('resize',()=>requestAnimationFrame(syncMapOverlays));document.addEventListener('fullscreenchange',()=>setTimeout(syncMapOverlays,80));$('#plantMapImg')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('.home-map-preview img')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('#btnUnlockDifusion').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminDifusionPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
 $('#btnUnlockOperacionales').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminOperacionalesPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
 $('#btnSaveDifusionMaterial').onclick=disableDuring($('#btnSaveDifusionMaterial'),()=>saveMaterialFromPanel('difusion'));
 $('#btnSaveOperacionalMaterial').onclick=disableDuring($('#btnSaveOperacionalMaterial'),()=>saveMaterialFromPanel('operacional'));
