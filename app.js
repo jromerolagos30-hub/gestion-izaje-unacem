@@ -45,10 +45,22 @@ async function sendAssistantQuestion(question){
   const loadingId='assistant-loading-'+Date.now();
   const root=$('#assistantMessages');if(root){const row=document.createElement('div');row.id=loadingId;row.className='assistant-message bot';row.innerHTML='<div class="assistant-avatar">✦</div><div class="assistant-bubble assistant-typing">Analizando documentos…</div>';root.appendChild(row);root.scrollTop=root.scrollHeight}
   try{
-    const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chatInput:q,message:q,question:q,source:'gestion-izaje-unacem'})});
+    const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mensaje:q})});
     const raw=await r.text();if(!r.ok)throw new Error(`HTTP ${r.status}: ${raw.slice(0,180)}`);
-    let answer=raw;try{const j=JSON.parse(raw);answer=j.output||j.answer||j.response||j.text||raw}catch(_){ }
-    $('#'+loadingId)?.remove();appendAssistantMessage('bot',answer||'No se recibió una respuesta del asistente.');setAssistantStatus('Respuesta generada con consulta al repositorio documental.');
+    let answer=raw.trim();
+    try{
+      const j=JSON.parse(raw);
+      if(Array.isArray(j)){
+        const first=j[0]||{};
+        answer=first.output||first.answer||first.response||first.text||JSON.stringify(first);
+      }else{
+        answer=j.output||j.answer||j.response||j.text||answer;
+      }
+    }catch(_){}
+    $('#'+loadingId)?.remove();
+    if(!answer)throw new Error('El webhook respondió sin contenido.');
+    appendAssistantMessage('bot',answer);
+    setAssistantStatus('Respuesta generada con consulta al repositorio documental.');
   }catch(e){
     $('#'+loadingId)?.remove();appendAssistantMessage('bot','No fue posible consultar el asistente en este momento. Verifica la conexión del webhook de producción.');setAssistantStatus(e.message||'Error de conexión',true);
   }finally{if(btn)btn.disabled=false}
