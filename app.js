@@ -596,13 +596,69 @@ async function saveControles(){const empresa=$('#coEmpresa').value,mes=$('#coMes
 function renderControles(){const emp=$('#coFiltroEmpresa')?.value||'';const arr=(state.controles||[]).filter(x=>!emp||x.empresa===emp);$('#coTable').innerHTML=`<div class="table-wrap"><table class="data-table"><thead><tr><th>Empresa</th><th>Mes</th><th>Año</th><th>Almacenamiento</th><th>Inspección mensual</th><th>Reunión previa</th><th>Estatus</th><th>Acción</th></tr></thead><tbody>${arr.map(x=>`<tr><td>${esc(x.empresa)}</td><td>${esc(x.mes)}</td><td>${esc(x.anio)}</td><td>${parseUrls(x.fotos1).length} foto(s)</td><td>${parseUrls(x.fotos2).length} foto(s)</td><td>${parseUrls(x.fotos3).length} foto(s)</td><td>${statusBadge(x.estatus)}</td><td><button class="link-btn" onclick="viewControl('${x.id}')">Ver evidencias</button></td></tr>`).join('')||'<tr><td colspan="8">Sin registros.</td></tr>'}</tbody></table></div>`}
 window.viewControl=id=>{const x=(state.controles||[]).find(r=>r.id===id);if(!x)return;const labels=['Almacenamiento correcto','Inspección mensual','Reuniones previas de izaje'];showModal(`Controles ${x.empresa} - ${x.mes} ${x.anio}`,['fotos1','fotos2','fotos3'].map((k,i)=>`<h3>${i+1}. ${labels[i]}</h3><div class="control-photo-grid">${parseUrls(x[k]).map(u=>`<div class="control-photo"><img src="${esc(driveThumb(u))}" alt="Evidencia" loading="lazy"><a class="btn secondary" href="${esc(u)}" target="_blank">Abrir original</a></div>`).join('')||'<div class="notice">Sin fotos.</div>'}</div>`).join(''))}
 function renderReviewQueue(){if(!state.reviewUnlocked||!$('#reviewQueue'))return;const type=$('#rvTipo')?.value||'',st=$('#rvEstado')?.value||'En revisión',emp=$('#rvEmpresa')?.value||'';let rows=[];(state.equipos||[]).forEach(x=>rows.push({...x,_type:'equipo'}));(state.personal||[]).forEach(x=>rows.push({...x,_type:'personal'}));rows=rows.filter(x=>(!type||x._type===type)&&(!st||x.estadoRevision===st)&&(!emp||x.empresa===emp));$('#reviewQueue').innerHTML=rows.map(x=>`<div class="review-card"><div class="panel-head"><div><b>${x._type==='equipo'?esc(x.tipo):esc(x.nombre)}</b><div style="color:var(--muted);font-size:12px">${esc(x.empresa)} · ${x._type==='equipo'?esc(x.serie):esc(x.dni)}</div></div>${statusBadge(x.estadoRevision)}</div><button class="btn secondary" onclick="openReview('${x._type}','${x.id}')">Ver registro y revisar</button></div>`).join('')||'<div class="notice">No hay registros con los filtros seleccionados.</div>'}
-window.openReview=(type,id)=>{const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);if(!x)return;const options=(state.aprobadores||[]).map(a=>`<option>${esc(a.nombre)}</option>`).join('');showModal('Revisión UNACEM',`<div class="review-grid"><div>${recordDetailHtml(x)}</div><div><label>Revisor UNACEM*<select id="reviewerName"><option value="">Seleccionar</option>${options}</select></label><label>Resultado*<select id="reviewStatus"><option value="Aprobado">Aprobado</option><option value="Observado">Observado</option></select></label><label>Comentarios<textarea id="reviewComment" rows="6" placeholder="Obligatorio si el estado es Observado"></textarea></label><button id="btnSubmitReview" class="btn primary full" onclick="submitInAppReview('${type}','${id}')">Guardar revisión</button></div></div>`)}
-window.submitInAppReview=async(type,id)=>{const btn=$('#btnSubmitReview');if(btn.disabled)return;const reviewer=$('#reviewerName').value,status=$('#reviewStatus').value,comment=$('#reviewComment').value.trim();if(!reviewer)return alert('Selecciona tu nombre de la lista.');if(status==='Observado'&&!comment)return alert('Debes ingresar comentarios cuando el registro es Observado.');btn.disabled=true;try{await api('reviewRecord',{type,id,reviewer,status,comment});closeModal();await refreshData();showModal('Revisión guardada',`<p>El registro quedó <b>${esc(status)}</b>.</p>`)}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}}
-async function init(){document.title=cfg.APP_NAME||document.title;$('#fechaHoy').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$$('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
-$('#btnSendAssistant')?.addEventListener('click',()=>sendAssistantQuestion());$('#btnClearAssistant')?.addEventListener('click',clearAssistantChat);$$('[data-assistant-question]').forEach(b=>b.addEventListener('click',()=>sendAssistantQuestion(b.dataset.assistantQuestion)));$('#assistantInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAssistantQuestion()}});$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearStatusChartSelection();renderSeguimiento()}));$('#btnApplyFilters').onclick=()=>{clearStatusChartSelection();renderSeguimiento()};['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearMapSelection();renderMapa()}));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();window.addEventListener('resize',()=>requestAnimationFrame(syncMapOverlays));document.addEventListener('fullscreenchange',()=>setTimeout(syncMapOverlays,80));$('#plantMapImg')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('.home-map-preview img')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('#btnUnlockDifusion').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminDifusionPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
-$('#btnUnlockOperacionales').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminOperacionalesPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
-$('#btnSaveDifusionMaterial').onclick=disableDuring($('#btnSaveDifusionMaterial'),()=>saveMaterialFromPanel('difusion'));
-$('#btnSaveOperacionalMaterial').onclick=disableDuring($('#btnSaveOperacionalMaterial'),()=>saveMaterialFromPanel('operacional'));
-['dfTipo','dfEmpresa','dfEstado','dfSearch'].forEach(id=>$('#'+id)?.addEventListener('change',renderDifusion));
-$('#btnDfApply').onclick=renderDifusion;$('#coAnio').value=new Date().getFullYear();$('#coMes').value=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][new Date().getMonth()];[['coFotos1','coPrev1'],['coFotos2','coPrev2'],['coFotos3','coPrev3']].forEach(([i,p])=>$('#'+i).onchange=()=>previewPhotos($('#'+i),$('#'+p)));$('#btnSaveControles').onclick=disableDuring($('#btnSaveControles'),saveControles);$('#coFiltroEmpresa').onchange=renderControles;$('#btnUnlockReview').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY){state.reviewUnlocked=true;$('#reviewLocked').classList.add('hidden');$('#reviewArea').classList.remove('hidden');renderReviewQueue()}else if(k)showModal('Clave incorrecta','<p>No se habilitó la revisión.</p>')};$('#btnRenderReview').onclick=renderReviewQueue;try{await refreshData();await reloadMap()}catch(e){showModal('Falta conectar el backend',`<p>${esc(e.message)}</p><p>Conserva en config.js la misma URL /exec que ya utiliza tu implementación.</p>`)}renderEqBatch();renderPeBatch();equipmentCertUI()}
-init();
+function companyNotificationEmails(company){
+  const row=(state.empresas||[]).find(e=>norm(e.empresa)===norm(company));
+  return String(row?.correos||'').trim();
+}
+function reviewEmailSectionHtml(x){
+  const emails=companyNotificationEmails(x.empresa);
+  return `<div id="reviewEmailBlock" class="review-email-block" style="display:none">
+    <div class="review-email-title">Notificación automática de observación</div>
+    <div>
+      <span class="review-email-label">Se enviará a:</span>
+      <div id="reviewMainRecipients" class="review-recipient-box">${emails?esc(emails):'<span class="muted">No hay correos configurados para esta empresa.</span>'}</div>
+    </div>
+    <div class="review-cc-grid">
+      <label>Correo en copia 1<input id="reviewCc1" type="email" placeholder="correo@empresa.com"></label>
+      <label>Correo en copia 2<input id="reviewCc2" type="email" placeholder="correo@empresa.com"></label>
+    </div>
+    <div class="review-email-help">Al guardar como <b>Observado</b>, se enviará automáticamente el registro y los comentarios de UNACEM.</div>
+  </div>`;
+}
+function updateReviewEmailVisibility(){
+  const block=$('#reviewEmailBlock'),status=$('#reviewStatus')?.value||'';
+  if(block)block.style.display=status==='Observado'?'block':'none';
+}
+window.openReview=(type,id)=>{
+  const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);
+  if(!x)return;
+  const options=(state.aprobadores||[]).map(a=>`<option>${esc(a.nombre)}</option>`).join('');
+  showModal('Revisión UNACEM',`<div class="review-grid"><div>${recordDetailHtml(x)}</div><div>
+    <label>Revisor UNACEM*<select id="reviewerName"><option value="">Seleccionar</option>${options}</select></label>
+    <label>Resultado*<select id="reviewStatus"><option value="Aprobado">Aprobado</option><option value="Observado">Observado</option></select></label>
+    <label>Comentarios<textarea id="reviewComment" rows="6" placeholder="Obligatorio si el estado es Observado"></textarea></label>
+    ${reviewEmailSectionHtml(x)}
+    <button id="btnSubmitReview" class="btn primary full" onclick="submitInAppReview('${type}','${id}')">Guardar revisión</button>
+  </div></div>`);
+  setTimeout(()=>{
+    $('#reviewStatus')?.addEventListener('change',updateReviewEmailVisibility);
+    updateReviewEmailVisibility();
+  },0);
+}
+window.submitInAppReview=async(type,id)=>{
+  const btn=$('#btnSubmitReview');
+  if(btn.disabled)return;
+  const reviewer=$('#reviewerName').value,status=$('#reviewStatus').value,comment=$('#reviewComment').value.trim();
+  const cc1=$('#reviewCc1')?.value.trim()||'',cc2=$('#reviewCc2')?.value.trim()||'';
+  if(!reviewer)return alert('Selecciona tu nombre de la lista.');
+  if(status==='Observado'&&!comment)return alert('Debes ingresar comentarios cuando el registro es Observado.');
+  if(status==='Observado'){
+    const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);
+    const main=companyNotificationEmails(x?.empresa||'');
+    if(!main)return alert('La empresa no tiene correos configurados en la pestaña Empresas.');
+  }
+  btn.disabled=true;
+  btn.textContent='Guardando...';
+  try{
+    const res=await api('reviewRecord',{type,id,reviewer,status,comment,cc1,cc2});
+    closeModal();
+    await refreshData();
+    showModal('Revisión guardada',status==='Observado'
+      ?`<p>El registro quedó <b>Observado</b> y la notificación fue enviada a <b>${esc(res?.notifiedTo||'los correos configurados')}</b>.</p>`
+      :`<p>El registro quedó <b>${esc(status)}</b>.</p>`);
+  }catch(e){
+    showModal('Error',`<p>${esc(e.message)}</p>`);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Guardar revisión'}
+  }
+}

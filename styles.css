@@ -327,3 +327,12 @@
   font-size:11px;
   line-height:1.35;
 }
+
+/* V5.4.5 - Notificación de registros observados */
+.review-email-block{margin:14px 0;padding:14px;border:1px solid #f3c4c6;border-radius:12px;background:#fff8f8}
+.review-email-title{font-weight:800;color:#b91c1c;margin-bottom:10px}
+.review-email-label{display:block;font-size:11px;color:#64748b;margin-bottom:4px}
+.review-recipient-box{min-height:38px;padding:9px 10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;line-height:1.4;word-break:break-word}
+.review-cc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.review-email-help{margin-top:9px;font-size:11px;color:#7f1d1d}
+@media(max-width:700px){.review-cc-grid{grid-template-columns:1fr}}
