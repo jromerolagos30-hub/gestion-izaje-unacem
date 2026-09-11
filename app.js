@@ -255,7 +255,7 @@ function positionOverlayOnContainedImage(container,img,overlay){if(!container||!
 function syncMapOverlays(){positionOverlayOnContainedImage($('#plantMap'),$('#plantMapImg'),$('#mapMarkers'));const home=$('.home-map-preview');if(home)positionOverlayOnContainedImage(home,home.querySelector('img'),$('#homeMapMarkers'))}
 function groupMapBySector(arr){const m=new Map();arr.filter(x=>x.x!=null&&x.y!=null).forEach(x=>{const key=`${norm(x.sector||'sin sector')}|${Number(x.x).toFixed(4)}|${Number(x.y).toFixed(4)}`;if(!m.has(key))m.set(key,{sector:x.sector||'Trabajo de izaje',x:Number(x.x),y:Number(x.y),items:[]});m.get(key).items.push(x)});return[...m.values()]}
 function groupMarkerState(g){if(g.items.some(x=>norm(x.estado).includes('ejec')))return'ejecucion';if(g.items.some(x=>norm(x.estado).includes('program')))return'programado';if(g.items.every(x=>norm(x.estado).includes('final')))return'finalizado';return'otro'}
-function renderHomeMapPreview(){const root=$('#homeMapMarkers');if(!root)return;root.innerHTML='';groupMapBySector(state.mapData||[]).slice(0,50).forEach(g=>{const wrap=document.createElement('div');wrap.className='sector-map-marker home-sector-map-marker';wrap.style.left=`${g.x}%`;wrap.style.top=`${g.y}%`;wrap.innerHTML=`<span class="marker ${groupMarkerState(g)}">${g.items.length}</span><span class="sector-map-label">${esc(g.sector)}</span>`;root.appendChild(wrap)});requestAnimationFrame(syncMapOverlays)}
+function renderHomeMapPreview(){const root=$('#homeMapMarkers');if(!root)return;root.innerHTML='';groupMapBySector((state.mapData||[]).filter(isTodayMapRecord)).slice(0,50).forEach(g=>{const wrap=document.createElement('div');wrap.className='sector-map-marker home-sector-map-marker';wrap.style.left=`${g.x}%`;wrap.style.top=`${g.y}%`;wrap.innerHTML=`<span class="marker ${groupMarkerState(g)}">${g.items.length}</span><span class="sector-map-label">${esc(g.sector)}</span>`;root.appendChild(wrap)});requestAnimationFrame(syncMapOverlays)}
 
 function jsonpTar(action,params={}){
   return new Promise((resolve,reject)=>{
@@ -275,6 +275,22 @@ function tarArr(v){
   try{const p=JSON.parse(v);return Array.isArray(p)?p:[v]}catch(e){return String(v).split(' | ').filter(Boolean)}
 }
 function tarSectorKey(v){return norm(v).trim().replace(/\s+/g,' ')}
+function localDateKey(d=new Date()){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function mapDateKey(v){
+  if(v===null||v===undefined||v==='')return '';
+  if(v instanceof Date&&!isNaN(v))return localDateKey(v);
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if(m)return `${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`;
+  const d=new Date(s);
+  return isNaN(d)?'':localDateKey(d);
+}
+function isTodayMapRecord(r){return mapDateKey(r?.fecha??r?.Fecha)===localDateKey()}
 function tarIsActive(r){return norm(r.EstadoOperativo||'ACTIVO')!=='finalizado'}
 async function loadTarExact(){
   const res=await jsonpTar('bootstrap');
@@ -285,7 +301,7 @@ async function loadTarExact(){
     y:Number(s.y??s.Y??0)
   })).filter(s=>s.nombre&&Number.isFinite(s.x)&&Number.isFinite(s.y));
   const sectorMap=Object.fromEntries(sectores.map(s=>[tarSectorKey(s.nombre),s]));
-  const regs=(res.data?.registros||[]).filter(tarIsActive).filter(r=>tarArr(r.TrabajoCritico).some(t=>norm(t).includes('izaje')));
+  const regs=(res.data?.registros||[]).filter(tarIsActive).filter(r=>tarArr(r.TrabajoCritico).some(t=>norm(t).includes('izaje'))).filter(r=>mapDateKey(r.Fecha)===localDateKey());
   return regs.map(r=>{
     const sector=sectorMap[tarSectorKey(r.Lugar)]||null;
     return {
@@ -306,7 +322,7 @@ async function reloadMap(){
     try{state.mapData=await loadTarExact()}
     catch(exactErr){
       console.warn('Se usará el respaldo del backend de Izaje:',exactErr);
-      state.mapData=await api('getIzajesTar');
+      state.mapData=(await api('getIzajesTar')).filter(isTodayMapRecord);
     }
     renderMapa();renderHomeMapPreview();
   }catch(e){showModal('Error al actualizar mapa',`<p>${esc(e.message)}</p>`)}
@@ -321,7 +337,7 @@ function clearMapSelection(){
 }
 function filteredMapRows(){
   const emp=$('#mapEmpresa')?.value||'',st=$('#mapEstado')?.value||'',q=norm($('#mapSearch')?.value||'');
-  let arr=(state.mapData||[]).filter(x=>(!emp||x.empresa===emp)&&(!st||x.estado===st)&&(!q||norm(JSON.stringify(x)).includes(q)));
+  let arr=(state.mapData||[]).filter(isTodayMapRecord).filter(x=>(!emp||x.empresa===emp)&&(!st||x.estado===st)&&(!q||norm(JSON.stringify(x)).includes(q)));
   const sel=getMapSelection();
   if(sel.type==='empresa'&&sel.value)arr=arr.filter(x=>x.empresa===sel.value);
   if(sel.type==='sector'&&sel.value)arr=arr.filter(x=>norm(x.sector)===norm(sel.value));
