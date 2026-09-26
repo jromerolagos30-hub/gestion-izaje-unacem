@@ -182,7 +182,7 @@ async function addPersonal(){
     const validacion=await api('validatePersonalDraft',{item});
     const estado=String(validacion?.estado||'ERROR').toUpperCase();
     if(estado!=='VALIDADO'){
-      return showModal('Certificado observado',`<div class="notice warning"><b>Validación automática: ${esc(estado)}</b><div style="margin-top:7px">${esc(validacion?.observacion||'La información ingresada no coincide con el certificado.')}</div></div><p style="margin-top:12px">Corrige la información o adjunta el certificado correspondiente. <b>El registro no fue agregado a la lista.</b></p>`);
+      return showModal('Certificado observado',`<div class="notice warning"><b>Validación por Agente IA: ${esc(estado)}</b><div style="margin-top:7px">${esc(validacion?.observacion||'La información ingresada no coincide con el certificado.')}</div></div><p style="margin-top:12px">Corrige la información o adjunta el certificado correspondiente. <b>El registro no fue agregado a la lista.</b></p>`);
     }
     state.peBatch.push(item);
     renderPeBatch();
@@ -201,7 +201,7 @@ async function savePersonal(){
   state.peBatch=[];
   renderPeBatch();
   await refreshData();
-  showModal('Registro enviado',`<p>Se registraron <b>${r.count}</b> competencias previamente validadas. Los registros quedaron <b>En revisión por UNACEM</b>.</p>`);
+  showModal('Registro enviado',`<p>Se registraron <b>${r.count}</b> competencias previamente validadas. Los registros quedaron <b>Aprobados</b> luego de la validación por Agente IA.</p>`);
 }
 function tableSimple(arr,keys,heads){return `<div class="table-wrap"><table class="data-table"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${arr.map(x=>`<tr>${keys.map(k=>`<td>${esc(x[k]||'')}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${heads.length}">Sin registros</td></tr>`}</tbody></table></div>`}
 
@@ -251,7 +251,7 @@ function renderSeguimiento(){
     }
   }
 }
-function trackTable(arr,type){const isEq=type==='equipo';const heads=isEq?['Empresa','Equipo','Serie','Capacidad','Certificadora','Vigencia','Estado','Observación','Acciones']:['Empresa','Nombre','DNI','Competencia','Fecha','Vigencia','Validación IA','Estado','Observación','Acciones'];return `<div class="table-wrap"><table class="data-table"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${arr.map(x=>`<tr>${isEq?`<td>${esc(x.empresa)}</td><td>${esc(x.tipo)}</td><td>${esc(x.serie)}</td><td>${esc(x.capacidad)}</td><td>${esc(x.certificadoraFinal||x.certificadora)}</td><td>${fmtDate(x.vigencia)}</td>`:`<td>${esc(x.empresa)}</td><td>${esc(x.nombre)}</td><td>${esc(x.dni)}</td><td>${esc(x.capacitacion)}</td><td>${fmtDate(x.fecha)}</td><td>${fmtDate(x.vigencia)}</td><td>${statusBadge(x.estadoValidacionIA||'NO EVALUADO')}</td>`}<td>${statusBadge(x.estadoRevision)}</td><td>${esc(x.observacion||'')}</td><td><button class="link-btn" onclick="viewRecord('${type}','${x.id}')">Ver registro</button> <button class="link-btn" onclick="editRecord('${type}','${x.id}')">${norm(x.estadoRevision).includes('observ')?'Levantar observación':'Editar'}</button> <button class="link-btn" onclick="deleteRecord('${type}','${x.id}','${esc(x.empresa)}')">Eliminar</button></td></tr>`).join('')||`<tr><td colspan="${isEq?9:10}">Sin registros</td></tr>`}</tbody></table></div>`}
+function trackTable(arr,type){const isEq=type==='equipo';const heads=isEq?['Empresa','Equipo','Serie','Capacidad','Certificadora','Vigencia','Estado','Observación','Acciones']:['Empresa','Nombre','DNI','Competencia','Fecha','Vigencia','Validación por Agente IA','Estado','Observación','Acciones'];return `<div class="table-wrap"><table class="data-table"><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${arr.map(x=>`<tr>${isEq?`<td>${esc(x.empresa)}</td><td>${esc(x.tipo)}</td><td>${esc(x.serie)}</td><td>${esc(x.capacidad)}</td><td>${esc(x.certificadoraFinal||x.certificadora)}</td><td>${fmtDate(x.vigencia)}</td>`:`<td>${esc(x.empresa)}</td><td>${esc(x.nombre)}</td><td>${esc(x.dni)}</td><td>${esc(x.capacitacion)}</td><td>${fmtDate(x.fecha)}</td><td>${fmtDate(x.vigencia)}</td><td>${statusBadge(x.estadoValidacionIA||'NO EVALUADO')}</td>`}<td>${statusBadge(x.estadoRevision)}</td><td>${esc(x.observacion||'')}</td><td><button class="link-btn" onclick="viewRecord('${type}','${x.id}')">Ver registro</button> <button class="link-btn" onclick="editRecord('${type}','${x.id}')">${norm(x.estadoRevision).includes('observ')?'Levantar observación':'Editar'}</button> <button class="link-btn" onclick="deleteRecord('${type}','${x.id}','${esc(x.empresa)}')">Eliminar</button></td></tr>`).join('')||`<tr><td colspan="${isEq?9:10}">Sin registros</td></tr>`}</tbody></table></div>`}
 function parseUrls(v){if(Array.isArray(v))return v;if(!v)return[];try{return JSON.parse(v)}catch(e){return String(v).split('|').filter(Boolean)}}
 function driveId(url){const s=String(url||'');const m=s.match(/\/d\/([\w-]+)/)||s.match(/[?&]id=([\w-]+)/);return m?m[1]:''}
 function drivePreview(url){const id=driveId(url);return id?`https://drive.google.com/file/d/${id}/preview`:url}
