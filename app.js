@@ -159,9 +159,7 @@ function renderEqBatch(){$('#eqBatchCount').textContent=`${state.eqBatch.length}
 async function saveEquipos(){if(!state.eqBatch.length)return showModal('Sin registros','<p>Agrega al menos un equipo.</p>');const r=await api('saveEquipos',{items:state.eqBatch});state.eqBatch=[];renderEqBatch();await refreshData();showModal('Registro enviado',`<p>Se registraron <b>${r.count}</b> equipos. La información quedó En revisión.</p>`)}
 function clearPersonal(){['peNombre','peDni','peFecha','peVigencia'].forEach(id=>$('#'+id).value='');$('#peCapEmpresa').value='ISEM';$('#peArchivo').value=''}
 async function addPersonal(){
-  if(!$('#peEmpresa').value||!$('#peNombre').value||!$('#peDni').value||!$('#peCapacitacion').value||!$('#peFecha').value)
-    return showModal('Faltan datos','<p>Completa los campos obligatorios.</p>');
-
+  if(!$('#peEmpresa').value||!$('#peNombre').value||!$('#peDni').value||!$('#peCapacitacion').value||!$('#peFecha').value)return showModal('Faltan datos','<p>Completa los campos obligatorios.</p>');
   const files=await filesToObjs($('#peArchivo'),6);
   if(!files.length)return showModal('Adjunto requerido','<p>Adjunta el certificado.</p>');
 
@@ -177,45 +175,28 @@ async function addPersonal(){
     archivos:files
   };
 
-  showModal('Validando certificado','<p>Estamos comparando la información ingresada con el certificado. Espera unos segundos...</p>');
-
-  let ia;
+  const btn=$('#btnAddPersonal');
+  const oldText=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='Validando certificado...'}
   try{
-    ia=await api('validatePersonalDraft',{item});
+    const validacion=await api('validatePersonalDraft',{item});
+    const estado=String(validacion?.estado||'ERROR').toUpperCase();
+    if(estado!=='VALIDADO'){
+      return showModal('Certificado observado',`<div class="notice warning"><b>Validación automática: ${esc(estado)}</b><div style="margin-top:7px">${esc(validacion?.observacion||'La información ingresada no coincide con el certificado.')}</div></div><p style="margin-top:12px">Corrige la información o adjunta el certificado correspondiente. <b>El registro no fue agregado a la lista.</b></p>`);
+    }
+    state.peBatch.push(item);
+    renderPeBatch();
+    clearPersonal();
+    showModal('Certificado validado',`<div class="notice success"><b>VALIDADO</b><div style="margin-top:7px">${esc(validacion?.observacion||'La información coincide con el certificado.')}</div></div><p style="margin-top:12px">La competencia fue agregada a la lista y ya puede registrarse.</p>`);
   }catch(e){
-    return showModal('No se pudo validar',`<p>${esc(e.message||'Error de validación')}</p><p><b>El registro no fue agregado a la lista.</b></p>`);
+    showModal('No se pudo validar',`<p>${esc(e.message||e)}</p><p><b>El registro no fue agregado a la lista.</b></p>`);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=oldText||'+ Agregar a la lista'}
   }
-
-  const estado=String(ia?.estado||'ERROR').toUpperCase();
-  if(estado!=='VALIDADO'){
-    return showModal('Certificado observado',`
-      <div class="notice warning">
-        <b>${esc(item.nombre)}</b><br>
-        Validación automática: <b>${esc(estado)}</b>
-        <div style="margin-top:8px">${esc(ia?.observacion||'La información ingresada no coincide con el certificado.')}</div>
-      </div>
-      <p style="margin-top:14px"><b>No se agregó a la lista.</b> Corrige los datos o adjunta el certificado correcto y vuelve a intentarlo.</p>`);
-  }
-
-  item.estadoValidacionIA='VALIDADO';
-  item.observacionIA=ia?.observacion||'Información validada correctamente contra el certificado.';
-  state.peBatch.push(item);
-  renderPeBatch();
-  clearPersonal();
-
-  showModal('Certificado validado',`
-    <div class="notice success">
-      <b>${esc(item.nombre)}</b><br>
-      Validación automática: <b>VALIDADO</b>
-      <div style="margin-top:8px">${esc(item.observacionIA)}</div>
-    </div>
-    <p style="margin-top:14px">La competencia fue agregada a la lista y ya puede registrarse.</p>`);
 }
 function renderPeBatch(){$('#peBatchCount').textContent=`${state.peBatch.length} personas`;$('#peBatchTable').innerHTML=tableSimple(state.peBatch,['empresa','nombre','dni','capacitacion','fecha','vigencia'],['Empresa','Nombre','DNI','Competencia','Fecha','Vigencia'])}
 async function savePersonal(){
   if(!state.peBatch.length)return showModal('Sin registros','<p>Agrega al menos una competencia validada.</p>');
-  const noValidados=state.peBatch.filter(x=>String(x.estadoValidacionIA||'').toUpperCase()!=='VALIDADO');
-  if(noValidados.length)return showModal('Validación pendiente','<p>Solo se pueden registrar competencias previamente validadas.</p>');
   const r=await api('savePersonal',{items:state.peBatch});
   state.peBatch=[];
   renderPeBatch();
