@@ -1,6 +1,6 @@
 
 const cfg=window.APP_CONFIG||{}, $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const ASSISTANT_WEBHOOK_URL='https://jonathanrl.app.n8n.cloud/webhook/chatbot-sst-docs';
+const ASSISTANT_WEBHOOK_URL='https://romerolagoserikapaola.app.n8n.cloud/webhook/chatbot-sst-docs';
 Chart.register(ChartDataLabels);
 const DIFFUSION_CATS=['Buenas Prácticas UNACEM PERÚ','Lecciones Aprendidas'];
 const OPERATIONAL_CATS=[
