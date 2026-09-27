@@ -67,6 +67,68 @@ async function sendAssistantQuestion(question){
 }
 function showModal(title,html){$('#modalContent').innerHTML=`<h2>${esc(title)}</h2>${html}`;$('#modal').classList.remove('hidden')}
 function closeModal(){$('#modal').classList.add('hidden')}
+const REVIEW_ACCESS_STORAGE_KEY='unacem_review_access_v1';
+function hasRememberedReviewAccess(){
+  try{return localStorage.getItem(REVIEW_ACCESS_STORAGE_KEY)==='1'}catch(e){return false}
+}
+function rememberReviewAccess(){
+  try{localStorage.setItem(REVIEW_ACCESS_STORAGE_KEY,'1')}catch(e){}
+}
+function requestUnacemReviewAccess(onSuccess){
+  if(state.reviewUnlocked||hasRememberedReviewAccess()){
+    state.reviewUnlocked=true;
+    onSuccess?.();
+    return;
+  }
+  showModal('Acceso a Revisión UNACEM',`
+    <div style="max-width:520px">
+      <p style="margin-top:0">Ingresa la clave de acceso UNACEM.</p>
+      <label>Clave de acceso
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="unacemAccessPassword" name="unacem-review-password" type="password"
+                 autocomplete="current-password" style="flex:1"
+                 placeholder="Clave de acceso UNACEM">
+          <button id="btnToggleUnacemPassword" type="button" class="btn secondary"
+                  style="white-space:nowrap">Mostrar</button>
+        </div>
+      </label>
+      <label style="display:flex;gap:8px;align-items:center;margin-top:12px">
+        <input id="rememberUnacemAccess" type="checkbox" style="width:auto">
+        <span>Recordar acceso en este dispositivo</span>
+      </label>
+      <button id="btnConfirmUnacemAccess" type="button" class="btn primary full"
+              style="margin-top:16px">Ingresar</button>
+      <div id="unacemAccessError" style="display:none;color:#b42318;font-weight:700;margin-top:10px">
+        Clave incorrecta.
+      </div>
+    </div>`);
+  setTimeout(()=>{
+    const input=$('#unacemAccessPassword'),toggle=$('#btnToggleUnacemPassword'),confirmBtn=$('#btnConfirmUnacemAccess');
+    input?.focus();
+    toggle?.addEventListener('click',()=>{
+      const show=input.type==='password';
+      input.type=show?'text':'password';
+      toggle.textContent=show?'Ocultar':'Mostrar';
+      input.focus();
+    });
+    const validate=()=>{
+      const key=input?.value||'';
+      if(!key)return;
+      if(key!==cfg.ADMIN_KEY){
+        const err=$('#unacemAccessError');if(err)err.style.display='block';
+        input?.focus();input?.select();
+        return;
+      }
+      state.reviewUnlocked=true;
+      if($('#rememberUnacemAccess')?.checked)rememberReviewAccess();
+      closeModal();
+      onSuccess?.();
+    };
+    confirmBtn?.addEventListener('click',validate);
+    input?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();validate()}});
+  },0);
+}
+
 function disableDuring(btn,fn){return async()=>{if(btn.disabled)return;btn.disabled=true;const old=btn.textContent;btn.textContent='Procesando...';try{await fn()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}finally{btn.disabled=false;btn.textContent=old}}}
 async function filesToObjs(input,max=10){const files=[...(input.files||[])].slice(0,max);return Promise.all(files.map(f=>new Promise((res,rej)=>{const rd=new FileReader();rd.onload=()=>res({name:f.name,mimeType:f.type,base64:String(rd.result).split(',')[1]});rd.onerror=rej;rd.readAsDataURL(f)})))}
 function setOptions(sel,items,placeholder='Seleccionar'){if(!sel)return;sel.innerHTML=`<option value="">${placeholder}</option>`+items.map(x=>`<option>${esc(x)}</option>`).join('')}
@@ -144,7 +206,25 @@ function drawCompanyStatus(id,arr,key,targetTable){
     }
   });
 }
-async function refreshData(){const d=await api('getData');Object.assign(state,d);populateSelectors();renderHome();renderEquiposStats();renderPersonalStats();renderSeguimiento();renderDifusion();renderOperationalMaterials();renderControles();renderReviewQueue();renderMapa()}
+function captureUiFilters(){
+  const ids=['fEmpresa','fEquipo','fEstado','fSearch','rvTipo','rvEstado','rvEmpresa'];
+  return Object.fromEntries(ids.map(id=>[id,$('#'+id)?.value??'']));
+}
+function restoreUiFilters(saved={}){
+  Object.entries(saved).forEach(([id,value])=>{
+    const el=$('#'+id);
+    if(el&&[...el.options||[]].some(o=>o.value===value))el.value=value;
+    else if(el&&el.tagName!=='SELECT')el.value=value;
+  });
+}
+async function refreshData(){
+  const savedFilters=captureUiFilters();
+  const d=await api('getData');
+  Object.assign(state,d);
+  populateSelectors();
+  restoreUiFilters(savedFilters);
+  renderHome();renderEquiposStats();renderPersonalStats();renderSeguimiento();renderDifusion();renderOperationalMaterials();renderControles();renderReviewQueue();renderMapa();
+}
 function populateSelectors(){const emps=(state.empresas||[]).filter(x=>String(x.activo||'SI').toUpperCase()!=='NO').map(x=>x.empresa);['eqEmpresa','peEmpresa','fEmpresa','mapEmpresa','coEmpresa','coFiltroEmpresa','rvEmpresa'].forEach(id=>setOptions($('#'+id),emps,['fEmpresa','mapEmpresa','coFiltroEmpresa','rvEmpresa'].includes(id)?'Todas las empresas':'Seleccionar empresa'));setOptions($('#eqTipo'),state.tipos||[],'Seleccionar equipo');setOptions($('#peCapacitacion'),state.competencias||[],'Seleccionar competencia');setOptions($('#fEquipo'),state.tipos||[],'Todos los equipos');const certBase=[...(state.certificadoras||[])];
 const certFallback=['COPMEC','Operatec','Certifica','CS BEAVER','Bureau Veritas','Industry Certificaciones','SGS'];
 certFallback.forEach(x=>{if(!certBase.some(v=>norm(v)===norm(x)))certBase.push(x)});
@@ -278,14 +358,7 @@ window.viewRecord=(type,id)=>{
   );
 }
 window.unlockReviewFromDetail=(type,id)=>{
-  const k=prompt('Clave de acceso UNACEM:');
-  if(!k)return;
-  if(k!==cfg.ADMIN_KEY){
-    showModal('Clave incorrecta','<p>No se habilitó la revisión del registro.</p>');
-    return;
-  }
-  state.reviewUnlocked=true;
-  openReview(type,id);
+  requestUnacemReviewAccess(()=>openReview(type,id));
 }
 window.deleteRecord=async(type,id,empresa)=>{const key=prompt('Ingrese la clave de eliminación:');if(!key)return;try{await api('deleteRecord',{type,id,key});await refreshData();showModal('Registro eliminado','<p>El registro fue eliminado correctamente.</p>')}catch(e){showModal('No se pudo eliminar',`<p>${esc(e.message)}</p>`)}}
 window.editRecord=(type,id)=>{const x=(type==='equipo'?state.equipos:state.personal).find(r=>r.id===id);if(!x)return;const observed=norm(x.estadoRevision).includes('observ');const common=`${observed?`<div class="notice warning"><b>Observación UNACEM:</b> ${esc(x.observacion||'')}</div>`:''}${attachmentsHtml(x.archivos)}`;if(type==='equipo'){showModal(observed?'Levantar observación del equipo':'Editar equipo',`${common}<div class="form-grid form-grid-3" style="margin-top:14px"><label>Estado actual del equipo*<select id="editEstado"><option value="Operativo" ${norm(x.estado)===norm('Operativo')?'selected':''}>Operativo</option><option value="Inoperativo" ${norm(x.estado)===norm('Inoperativo')?'selected':''}>Inoperativo</option><option value="Fuera de servicio" ${norm(x.estado)===norm('Fuera de servicio')?'selected':''}>Fuera de servicio</option></select><small class="field-help">Actualiza este campo cuando se detecte una anomalía o cambie la condición del equipo en campo.</small></label><label>Marca<input id="editMarca" value="${esc(x.marca)}"></label><label>Modelo<input id="editModelo" value="${esc(x.modelo)}"></label><label>Serie<input id="editSerie" value="${esc(x.serie)}"></label><label>Capacidad TON<input id="editCapacidad" value="${esc(x.capacidad)}"></label><label>Lugar<input id="editLugar" value="${esc(x.lugar)}"></label><label>Fecha certificación<input id="editFechaCert" type="date" value="${dateInput(x.fechaCert)}"></label><label>Vigencia<input id="editVigencia" type="date" value="${dateInput(x.vigencia)}" readonly></label><label class="span-2">Agregar documentos para levantar observación<input id="editFiles" type="file" multiple accept="image/*,.pdf"></label><label class="span-3">Comentario de la empresa<textarea id="editComment" rows="3">${esc(x.observacionEmpresa||'')}</textarea></label></div><button id="btnSaveEdit" class="btn primary full" style="margin-top:12px" onclick="saveFullEdit('equipo','${id}')">Enviar actualización a revisión</button>`);setTimeout(()=>{$('#editFechaCert').onchange=()=>$('#editVigencia').value=$('#editFechaCert').value?addYears($('#editFechaCert').value,1):''},0)}else{showModal(observed?'Levantar observación de competencia':'Editar competencia',`${common}<div class="form-grid form-grid-3" style="margin-top:14px"><label>Nombre<input id="editNombre" value="${esc(x.nombre)}"></label><label>DNI<input id="editDni" value="${esc(x.dni)}"></label><label>Capacitación<input id="editCap" value="${esc(x.capacitacion)}"></label><label>Fecha capacitación<input id="editFecha" type="date" value="${dateInput(x.fecha)}"></label><label>Vigencia<input id="editVigencia" type="date" value="${dateInput(x.vigencia)}" readonly></label><label>Empresa capacitadora<input value="ISEM" readonly></label><label class="span-2">Agregar documentos para levantar observación<input id="editFiles" type="file" multiple accept="image/*,.pdf"></label><label class="span-3">Comentario de la empresa<textarea id="editComment" rows="3">${esc(x.observacionEmpresa||'')}</textarea></label></div><button id="btnSaveEdit" class="btn primary full" style="margin-top:12px" onclick="saveFullEdit('personal','${id}')">Enviar actualización a revisión</button>`);setTimeout(()=>{$('#editFecha').onchange=()=>$('#editVigencia').value=$('#editFecha').value?addYears($('#editFecha').value,2):''},0)}}
@@ -727,5 +800,5 @@ $('#btnUnlockOperacionales').onclick=()=>{const k=prompt('Clave de acceso UNACEM
 $('#btnSaveDifusionMaterial').onclick=disableDuring($('#btnSaveDifusionMaterial'),()=>saveMaterialFromPanel('difusion'));
 $('#btnSaveOperacionalMaterial').onclick=disableDuring($('#btnSaveOperacionalMaterial'),()=>saveMaterialFromPanel('operacional'));
 ['dfTipo','dfEmpresa','dfEstado','dfSearch'].forEach(id=>$('#'+id)?.addEventListener('change',renderDifusion));
-$('#btnDfApply').onclick=renderDifusion;$('#coAnio').value=new Date().getFullYear();$('#coMes').value=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][new Date().getMonth()];[['coFotos1','coPrev1'],['coFotos2','coPrev2'],['coFotos3','coPrev3']].forEach(([i,p])=>$('#'+i).onchange=()=>previewPhotos($('#'+i),$('#'+p)));$('#btnSaveControles').onclick=disableDuring($('#btnSaveControles'),saveControles);$('#coFiltroEmpresa').onchange=renderControles;$('#btnUnlockReview').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY){state.reviewUnlocked=true;$('#reviewLocked').classList.add('hidden');$('#reviewArea').classList.remove('hidden');renderReviewQueue()}else if(k)showModal('Clave incorrecta','<p>No se habilitó la revisión.</p>')};$('#btnRenderReview').onclick=renderReviewQueue;try{await refreshData();await reloadMap()}catch(e){showModal('Falta conectar el backend',`<p>${esc(e.message)}</p><p>Conserva en config.js la misma URL /exec que ya utiliza tu implementación.</p>`)}renderEqBatch();renderPeBatch();equipmentCertUI()}
+$('#btnDfApply').onclick=renderDifusion;$('#coAnio').value=new Date().getFullYear();$('#coMes').value=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][new Date().getMonth()];[['coFotos1','coPrev1'],['coFotos2','coPrev2'],['coFotos3','coPrev3']].forEach(([i,p])=>$('#'+i).onchange=()=>previewPhotos($('#'+i),$('#'+p)));$('#btnSaveControles').onclick=disableDuring($('#btnSaveControles'),saveControles);$('#coFiltroEmpresa').onchange=renderControles;$('#btnUnlockReview').onclick=()=>requestUnacemReviewAccess(()=>{state.reviewUnlocked=true;$('#reviewLocked').classList.add('hidden');$('#reviewArea').classList.remove('hidden');renderReviewQueue()});$('#btnRenderReview').onclick=renderReviewQueue;if(hasRememberedReviewAccess()){state.reviewUnlocked=true;$('#reviewLocked')?.classList.add('hidden');$('#reviewArea')?.classList.remove('hidden')}try{await refreshData();await reloadMap()}catch(e){showModal('Falta conectar el backend',`<p>${esc(e.message)}</p><p>Conserva en config.js la misma URL /exec que ya utiliza tu implementación.</p>`)}renderEqBatch();renderPeBatch();equipmentCertUI()}
 init();
