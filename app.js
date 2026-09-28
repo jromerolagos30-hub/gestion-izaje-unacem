@@ -134,7 +134,7 @@ async function filesToObjs(input,max=10){const files=[...(input.files||[])].slic
 function setOptions(sel,items,placeholder='Seleccionar'){if(!sel)return;sel.innerHTML=`<option value="">${placeholder}</option>`+items.map(x=>`<option>${esc(x)}</option>`).join('')}
 function countBy(arr,key){const o={};arr.forEach(x=>{const k=x[key]||'Sin dato';o[k]=(o[k]||0)+1});return o}
 function colors(n){return ['#ed1c24','#3ba0df','#22a05a','#f0ae22','#805ad5','#64748b','#e8793c','#0f766e'].slice(0,Math.max(1,n))}
-function drawChart(id,type,data,key,legend=true){const el=$('#'+id);if(!el)return;if(state.charts[key])state.charts[key].destroy();const labels=Object.keys(data),vals=Object.values(data);state.charts[key]=new Chart(el,{type,data:{labels,datasets:[{label:'Cantidad',data:vals,backgroundColor:colors(labels.length),borderWidth:type==='doughnut'?1:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:legend,position:'bottom'},datalabels:{color:type==='doughnut'?'#fff':'#263442',anchor:type==='bar'?'end':'center',align:type==='bar'?'top':'center',font:{weight:'700'},formatter:v=>v||''}},scales:type==='bar'?{y:{beginAtZero:true,ticks:{precision:0}}}:{}}})}
+function drawChart(id,type,data,key,legend=true){const el=$('#'+id);if(!el)return;if(state.charts[key])state.charts[key].destroy();const labels=Object.keys(data),vals=Object.values(data),isBar=type==='bar';if(isBar){const box=el.closest('.chart-box');if(box)box.style.height=Math.max(260,labels.length*42+70)+'px'}state.charts[key]=new Chart(el,{type,data:{labels,datasets:[{label:'Cantidad',data:vals,backgroundColor:colors(labels.length),borderWidth:type==='doughnut'?1:0,borderRadius:isBar?7:0}]},options:{indexAxis:isBar?'y':'x',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:legend&&!isBar,position:'bottom'},datalabels:{color:type==='doughnut'?'#fff':'#263442',anchor:isBar?'end':'center',align:isBar?'right':'center',clamp:true,font:{weight:'700'},formatter:v=>v||''}},scales:isBar?{x:{beginAtZero:true,ticks:{precision:0}},y:{ticks:{autoSkip:false,font:{size:11}}}}:{}}})}
 const stackTotalsPlugin={id:'stackTotals',afterDatasetsDraw(chart){const{ctx,scales}=chart;if(!scales?.x||!scales?.y)return;ctx.save();ctx.fillStyle='#172536';ctx.font='700 12px Inter, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='bottom';chart.data.labels.forEach((_,i)=>{const total=chart.data.datasets.reduce((s,ds)=>s+(Number(ds.data[i])||0),0);if(!total)return;ctx.fillText(`Total ${total}`,scales.x.getPixelForValue(i),scales.y.getPixelForValue(total)-5)});ctx.restore()}};
 
 function getStatusChartSelection(){
@@ -155,10 +155,10 @@ function toggleStatusChartSelection(company,status,target){
   setTimeout(()=>$('#'+target)?.scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
 function manualStatusFilters(){
-  const emp=$('#fEmpresa')?.value||'',eq=$('#fEquipo')?.value||'',st=$('#fEstado')?.value||'',q=norm($('#fSearch')?.value||'');
+  const emp=$('#fEmpresa')?.value||'',sede=$('#fSede')?.value||'',eq=$('#fEquipo')?.value||'',cap=$('#fCapacitacion')?.value||'',st=$('#fEstado')?.value||'',q=norm($('#fSearch')?.value||'');
   return{
-    fe:(state.equipos||[]).filter(x=>(!emp||x.empresa===emp)&&(!eq||x.tipo===eq)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q))),
-    fp:(state.personal||[]).filter(x=>(!emp||x.empresa===emp)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q)))
+    fe:(state.equipos||[]).filter(x=>(!emp||x.empresa===emp)&&(!sede||x.sede===sede)&&(!eq||x.tipo===eq)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q))),
+    fp:(state.personal||[]).filter(x=>(!emp||x.empresa===emp)&&(!sede||x.sede===sede)&&(!cap||x.capacitacion===cap)&&(!st||x.estadoRevision===st)&&(!q||norm(JSON.stringify(x)).includes(q)))
   };
 }
 function applyInteractiveStatusSelection(arr){
@@ -186,7 +186,7 @@ function drawCompanyStatus(id,arr,key,targetTable){
     data:{labels:companies,datasets},
     plugins:[stackTotalsPlugin],
     options:{
-      responsive:true,maintainAspectRatio:false,layout:{padding:{top:22}},
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:24}},
       onClick:(evt,elements,chart)=>{
         if(!elements.length)return;
         const hit=elements[0];
@@ -202,12 +202,12 @@ function drawCompanyStatus(id,arr,key,targetTable){
         datalabels:{display:ctx=>Number(ctx.dataset.data[ctx.dataIndex])>0,color:'#fff',anchor:'center',align:'center',clamp:true,font:{weight:'800',size:13},textStrokeColor:'rgba(0,0,0,.22)',textStrokeWidth:2,formatter:v=>v>0?String(v):''},
         tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,footer:()=> 'Clic para filtrar las tablas · clic nuevamente para quitar filtro'}}
       },
-      scales:{x:{stacked:true,ticks:{autoSkip:false,maxRotation:25,minRotation:0}},y:{stacked:true,beginAtZero:true,ticks:{precision:0,stepSize:1}}}
+      scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0,stepSize:1}},y:{stacked:true,ticks:{autoSkip:false,font:{size:11}}}}
     }
   });
 }
 function captureUiFilters(){
-  const ids=['fEmpresa','fEquipo','fEstado','fSearch','rvTipo','rvEstado','rvEmpresa'];
+  const ids=['fEmpresa','fSede','fEquipo','fCapacitacion','fEstado','fSearch','dfTipo','dfEmpresa','dfSede','dfEstado','dfSearch','rvTipo','rvEstado','rvEmpresa'];
   return Object.fromEntries(ids.map(id=>[id,$('#'+id)?.value??'']));
 }
 function restoreUiFilters(saved={}){
@@ -225,12 +225,12 @@ async function refreshData(){
   restoreUiFilters(savedFilters);
   renderHome();renderEquiposStats();renderPersonalStats();renderSeguimiento();renderDifusion();renderOperationalMaterials();renderControles();renderReviewQueue();renderMapa();
 }
-function populateSelectors(){const emps=(state.empresas||[]).filter(x=>String(x.activo||'SI').toUpperCase()!=='NO').map(x=>x.empresa);['eqEmpresa','peEmpresa','fEmpresa','mapEmpresa','coEmpresa','coFiltroEmpresa','rvEmpresa'].forEach(id=>setOptions($('#'+id),emps,['fEmpresa','mapEmpresa','coFiltroEmpresa','rvEmpresa'].includes(id)?'Todas las empresas':'Seleccionar empresa'));setOptions($('#eqTipo'),state.tipos||[],'Seleccionar equipo');setOptions($('#peCapacitacion'),state.competencias||[],'Seleccionar competencia');setOptions($('#fEquipo'),state.tipos||[],'Todos los equipos');const certBase=[...(state.certificadoras||[])];
+function populateSelectors(){const emps=(state.empresas||[]).filter(x=>String(x.activo||'SI').toUpperCase()!=='NO').map(x=>x.empresa);['eqEmpresa','peEmpresa','fEmpresa','mapEmpresa','coEmpresa','coFiltroEmpresa','rvEmpresa'].forEach(id=>setOptions($('#'+id),emps,['fEmpresa','mapEmpresa','coFiltroEmpresa','rvEmpresa'].includes(id)?'Todas las empresas':'Seleccionar empresa'));setOptions($('#eqTipo'),state.tipos||[],'Seleccionar equipo');setOptions($('#peCapacitacion'),state.competencias||[],'Seleccionar competencia');setOptions($('#fEquipo'),state.tipos||[],'Todos los equipos');setOptions($('#fCapacitacion'),state.competencias||[],'Todas las competencias');const certBase=[...(state.certificadoras||[])];
 const certFallback=['COPMEC','Operatec','Certifica','CS BEAVER','Bureau Veritas','Industry Certificaciones','SGS'];
 certFallback.forEach(x=>{if(!certBase.some(v=>norm(v)===norm(x)))certBase.push(x)});
 setOptions($('#eqCertificadora'),[...certBase,'Certificado del propio fabricante','Otro'],'Seleccionar certificadora');if($('#dfEmpresa'))setOptions($('#dfEmpresa'),emps,'Todas las empresas');if($('#opBpCategoria'))setOptions($('#opBpCategoria'),OPERATIONAL_CATS,'Seleccionar apartado')}
 function renderHome(){renderHomeMapPreview()}
-function renderEquiposStats(){const a=state.equipos||[];if($('#eqKpis'))$('#eqKpis').innerHTML=[['Equipos registrados',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawChart('chartEquiposTipo','doughnut',countBy(a,'tipo'),'eqTipo',true);drawChart('chartEquiposRevision','doughnut',countBy(a,'estadoRevision'),'eqRev',true)}
+function renderEquiposStats(){const a=state.equipos||[];if($('#eqKpis'))$('#eqKpis').innerHTML=[['Equipos registrados',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawChart('chartEquiposTipo','bar',countBy(a,'tipo'),'eqTipo',false);drawChart('chartEquiposRevision','bar',countBy(a,'estadoRevision'),'eqRev',false)}
 function renderPersonalStats(){const a=state.personal||[];if($('#peKpis'))$('#peKpis').innerHTML=[['Personal registrado',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawChart('chartPersonalCap','doughnut',countBy(a,'capacitacion'),'peCap',true);drawChart('chartPersonalRevision','doughnut',countBy(a,'estadoRevision'),'peRev',true)}
 function equipmentCertUI(){const v=$('#eqCertificadora').value,other=v==='Otro',manufacturer=v==='Certificado del propio fabricante';$('#eqOtraWrap').classList.toggle('hidden',!other);$('#eqFabricanteWrap').classList.toggle('hidden',!manufacturer);const special=other||manufacturer;$('#eqArchivoLabel').childNodes[0].nodeValue=special?'Certificado de Operatividad / Ficha Técnica / Orden de Compra*':'Certificado de Operatividad / Ficha Técnica*';$('#eqFechaOptional').textContent=manufacturer?'(opcional si no figura en el certificado)':'';const w=$('#eqWarning');if(other){w.textContent='La empresa certificadora no está en la lista homologada. El registro quedará en evaluación por UNACEM.';w.classList.remove('hidden')}else if(manufacturer){w.textContent='Si el certificado del fabricante no cuenta con fecha de certificación, adjunta la Orden de Compra que valide la fecha de adquisición. El registro quedará en evaluación por UNACEM.';w.classList.remove('hidden')}else w.classList.add('hidden')}
 function clearEquipo(){['eqMarca','eqModelo','eqSerie','eqCapacidad','eqLugar','eqOtraCertificadora','eqFabricante','eqFechaCert','eqVigencia'].forEach(id=>$('#'+id).value='');$('#eqArchivo').value=''}
@@ -306,8 +306,8 @@ function renderSeguimiento(){
   drawCompanyStatus('chartPersonalEmpresaStatus',base.fp,'peCompany','trackPersonalTable');
 
   // Tablas y gráficos secundarios sí responden al clic interactivo.
-  drawChart('chartTrackEquiposTipo','doughnut',countBy(fe,'tipo'),'trackEqType',true);
-  drawChart('chartTrackPersonalCap','doughnut',countBy(fp,'capacitacion'),'trackPeCap',true);
+  drawChart('chartTrackEquiposTipo','bar',countBy(fe,'tipo'),'trackEqType',false);
+  drawChart('chartTrackPersonalCap','bar',countBy(fp,'capacitacion'),'trackPeCap',false);
   $('#trackEquiposTable').innerHTML=trackTable(fe,'equipo');
   $('#trackPersonalTable').innerHTML=trackTable(fp,'personal');
 
@@ -631,10 +631,10 @@ window.viewBestPractice=async id=>{
 function renderDifusion(){
   const root=$('#diffusionMaterialSections');if(!root)return;
   const all=(state.buenas||[]).filter(isDiffusionMaterial);
-  const type=$('#dfTipo')?.value||'',emp=$('#dfEmpresa')?.value||'',st=$('#dfEstado')?.value||'',q=norm($('#dfSearch')?.value||'');
+  const type=$('#dfTipo')?.value||'',emp=$('#dfEmpresa')?.value||'',sede=$('#dfSede')?.value||'',st=$('#dfEstado')?.value||'',q=norm($('#dfSearch')?.value||'');
   let mats=all.filter(x=>(!type||norm(x.categoria)===norm(type))&&(!q||norm(`${x.codigo} ${x.titulo} ${x.detalle}`).includes(q)));
   if(emp||st)mats=mats.filter(x=>{
-    const rec=(state.difusion||[]).find(d=>d.materialId===x.id&&(!emp||d.empresa===emp));
+    const rec=(state.difusion||[]).find(d=>diffusionMatches(d,x,emp,sede));
     if(st==='Difundido')return !!rec&&norm(rec.estatus)==='difundido';
     if(st==='Pendiente')return !rec||norm(rec.estatus)!=='difundido';
     return true;
@@ -645,33 +645,40 @@ function renderDifusion(){
   }).join('');
   renderDiffusionKpis(all);renderDiffusionMatrix(all);renderAdminMaterialList('difusion');
 }
+
+function diffusionMatches(d,m,empresa='',sede=''){
+  const materialOk=String(d.materialId||'')===String(m.id||'') || (d.codigo&&m.codigo&&norm(d.codigo)===norm(m.codigo)) || (d.titulo&&m.titulo&&norm(d.titulo)===norm(m.titulo));
+  return materialOk&&(!empresa||norm(d.empresa)===norm(empresa))&&(!sede||norm(d.sede)===norm(sede))&&norm(d.estatus)==='difundido';
+}
 function renderDiffusionKpis(materials){
   const companies=(state.empresas||[]).filter(e=>String(e.activo||'SI').toUpperCase()!=='NO');
+  const sede=$('#dfSede')?.value||'';
   const expected=materials.length*companies.length;
-  const completed=new Set((state.difusion||[]).filter(d=>norm(d.estatus)==='difundido').map(d=>`${d.materialId}|${d.empresa}`)).size;
-  const pct=expected?Math.round(completed/expected*100):0;
-  const full=materials.filter(m=>companies.length&&companies.every(e=>(state.difusion||[]).some(d=>d.materialId===m.id&&d.empresa===e.empresa&&norm(d.estatus)==='difundido'))).length;
+  let completed=0;materials.forEach(m=>companies.forEach(e=>{if((state.difusion||[]).some(d=>diffusionMatches(d,m,e.empresa,sede)))completed++}));
+  const rawPct=expected?completed/expected*100:0;
+  const pct=rawPct>0&&rawPct<1?rawPct.toFixed(1):Math.round(rawPct);
+  const full=materials.filter(m=>companies.length&&companies.every(e=>(state.difusion||[]).some(d=>diffusionMatches(d,m,e.empresa,sede)))).length;
   $('#difusionKpis').innerHTML=[['Materiales publicados',materials.length,'Buenas prácticas + lecciones'],['Cumplimiento global',pct+'%','Difusiones registradas'],['Pendientes',Math.max(0,expected-completed),'Empresa × material'],['100% difundidos',full,'Materiales completos']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');
 }
 function renderDiffusionMatrix(materials){
   const root=$('#diffusionMatrix');if(!root)return;
   const companies=(state.empresas||[]).filter(e=>String(e.activo||'SI').toUpperCase()!=='NO').map(e=>e.empresa);
-  const type=$('#dfTipo')?.value||'',q=norm($('#dfSearch')?.value||'');
+  const type=$('#dfTipo')?.value||'',sede=$('#dfSede')?.value||'',q=norm($('#dfSearch')?.value||'');
   const mats=materials.filter(x=>(!type||norm(x.categoria)===norm(type))&&(!q||norm(`${x.codigo} ${x.titulo}`).includes(q)));
-  root.innerHTML=`<div class="table-wrap"><table class="data-table diffusion-matrix"><thead><tr><th>Código</th><th>Material</th>${companies.map(e=>`<th>${esc(e)}</th>`).join('')}</tr></thead><tbody>${mats.map(m=>`<tr><td><b>${esc(materialCode(m))}</b></td><td>${esc(m.titulo)}</td>${companies.map(e=>{const r=(state.difusion||[]).find(d=>d.materialId===m.id&&d.empresa===e&&norm(d.estatus)==='difundido');return `<td class="${r?'cell-ok':'cell-pending'}">${r?'✓':'Pend.'}</td>`}).join('')}</tr>`).join('')||'<tr><td colspan="99">Sin materiales.</td></tr>'}</tbody></table></div>`;
+  root.innerHTML=`<div class="table-wrap"><table class="data-table diffusion-matrix"><thead><tr><th>Código</th><th>Material</th>${companies.map(e=>`<th>${esc(e)}</th>`).join('')}</tr></thead><tbody>${mats.map(m=>`<tr><td><b>${esc(materialCode(m))}</b></td><td>${esc(m.titulo)}</td>${companies.map(e=>{const r=(state.difusion||[]).find(d=>diffusionMatches(d,m,e,sede));return `<td class="${r?'cell-ok':'cell-pending'}">${r?'✓':'Pend.'}</td>`}).join('')}</tr>`).join('')||'<tr><td colspan="99">Sin materiales.</td></tr>'}</tbody></table></div>`;
 }
 window.openDiffusionForm=id=>{
   const x=(state.buenas||[]).find(r=>r.id===id);if(!x)return;
   const empresas=(state.empresas||[]).filter(e=>String(e.activo||'SI').toUpperCase()!=='NO').map(e=>`<option>${esc(e.empresa)}</option>`).join('');
-  showModal('Registrar evidencia de difusión',`<div class="notice info"><b>${esc(materialCode(x))}</b> · ${esc(x.titulo)}</div><div class="form-grid form-grid-3" style="margin-top:12px"><label>Empresa*<select id="diffEmpresa"><option value="">Seleccionar empresa</option>${empresas}</select></label><label>Fecha de difusión*<input id="diffFecha" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Responsable*<input id="diffResponsable" placeholder="Nombre del responsable"></label><label class="span-2">Evidencia de difusión*<input id="diffFiles" type="file" multiple accept="image/*,.pdf"></label><label class="span-3">Observación<textarea id="diffObs" rows="3" placeholder="Opcional"></textarea></label></div><div class="notice">Adjunta al menos una evidencia: registro, fotografía o PDF de difusión.</div><button id="btnSaveDiffusion" class="btn primary full" onclick="saveDiffusionEvidence('${id}')">Guardar evidencia de difusión</button>`);
+  showModal('Registrar evidencia de difusión',`<div class="notice info"><b>${esc(materialCode(x))}</b> · ${esc(x.titulo)}</div><div class="form-grid form-grid-3" style="margin-top:12px"><label>Empresa*<select id="diffEmpresa"><option value="">Seleccionar empresa</option>${empresas}</select></label><label>Sede*<select id="diffSede"><option>Atocongo</option><option>Condorcocha</option><option>Terminal Portuario</option></select></label><label>Fecha de difusión*<input id="diffFecha" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Responsable*<input id="diffResponsable" placeholder="Nombre del responsable"></label><label class="span-2">Evidencia de difusión*<input id="diffFiles" type="file" multiple accept="image/*,.pdf"></label><label class="span-3">Observación<textarea id="diffObs" rows="3" placeholder="Opcional"></textarea></label></div><div class="notice">Adjunta al menos una evidencia: registro, fotografía o PDF de difusión.</div><button id="btnSaveDiffusion" class="btn primary full" onclick="saveDiffusionEvidence('${id}')">Guardar evidencia de difusión</button>`);
 }
 window.saveDiffusionEvidence=async id=>{
   const btn=$('#btnSaveDiffusion');if(btn.disabled)return;
-  const empresa=$('#diffEmpresa').value,fecha=$('#diffFecha').value,responsable=$('#diffResponsable').value.trim();
+  const empresa=$('#diffEmpresa').value,sede=$('#diffSede').value,fecha=$('#diffFecha').value,responsable=$('#diffResponsable').value.trim();
   if(!empresa||!fecha||!responsable)return alert('Empresa, fecha y responsable son obligatorios.');
   const evidencias=await filesToObjs($('#diffFiles'),4);if(!evidencias.length)return alert('Adjunta al menos una evidencia de difusión.');
   btn.disabled=true;btn.textContent='Guardando...';
-  try{await api('saveDifusion',{item:{materialId:id,empresa,fechaDifusion:fecha,responsable,observacion:$('#diffObs').value.trim(),evidencias}});closeModal();await refreshData();showModal('Difusión registrada','<p>La evidencia quedó registrada con estatus <b>Difundido</b>.</p>')}
+  try{await api('saveDifusion',{item:{materialId:id,empresa,sede,fechaDifusion:fecha,responsable,observacion:$('#diffObs').value.trim(),evidencias}});closeModal();await refreshData();showModal('Difusión registrada','<p>La evidencia quedó registrada con estatus <b>Difundido</b>.</p>')}
   catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}
   finally{if(btn){btn.disabled=false;btn.textContent='Guardar evidencia de difusión'}}
 }
@@ -795,10 +802,10 @@ window.submitInAppReview=async(type,id)=>{
 }
 
 async function init(){document.title=cfg.APP_NAME||document.title;$('#fechaHoy').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});$$('.nav-item').forEach(b=>b.onclick=()=>go(b.dataset.view));$$('[data-go]').forEach(b=>b.onclick=()=>go(b.dataset.go));
-$('#btnSendAssistant')?.addEventListener('click',()=>sendAssistantQuestion());$('#btnClearAssistant')?.addEventListener('click',clearAssistantChat);$$('[data-assistant-question]').forEach(b=>b.addEventListener('click',()=>sendAssistantQuestion(b.dataset.assistantQuestion)));$('#assistantInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAssistantQuestion()}});$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fEquipo','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearStatusChartSelection();renderSeguimiento()}));$('#btnApplyFilters').onclick=()=>{clearStatusChartSelection();renderSeguimiento()};['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearMapSelection();renderMapa()}));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();window.addEventListener('resize',()=>requestAnimationFrame(syncMapOverlays));document.addEventListener('fullscreenchange',()=>setTimeout(syncMapOverlays,80));$('#plantMapImg')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('.home-map-preview img')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('#btnUnlockDifusion').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminDifusionPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
+$('#btnSendAssistant')?.addEventListener('click',()=>sendAssistantQuestion());$('#btnClearAssistant')?.addEventListener('click',clearAssistantChat);$$('[data-assistant-question]').forEach(b=>b.addEventListener('click',()=>sendAssistantQuestion(b.dataset.assistantQuestion)));$('#assistantInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAssistantQuestion()}});$('#modalClose').onclick=closeModal;$('#modal').onclick=e=>{if(e.target.id==='modal')closeModal()};$('#btnRefresh').onclick=async()=>{try{await refreshData()}catch(e){showModal('Error',`<p>${esc(e.message)}</p>`)}};$('#eqCertificadora').onchange=equipmentCertUI;$('#eqFechaCert').onchange=()=>$('#eqVigencia').value=$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'';$('#btnAddEquipo').onclick=addEquipo;$('#btnClearEquipo').onclick=clearEquipo;$('#btnSaveEquipos').onclick=disableDuring($('#btnSaveEquipos'),saveEquipos);$('#peFecha').onchange=()=>$('#peVigencia').value=addYears($('#peFecha').value,2);$('#btnAddPersonal').onclick=addPersonal;$('#btnClearPersonal').onclick=clearPersonal;$('#btnSavePersonal').onclick=disableDuring($('#btnSavePersonal'),savePersonal);['fEmpresa','fSede','fEquipo','fCapacitacion','fEstado','fSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearStatusChartSelection();renderSeguimiento()}));$('#btnApplyFilters').onclick=()=>{clearStatusChartSelection();renderSeguimiento()};['mapEmpresa','mapEstado','mapSearch'].forEach(id=>$('#'+id).addEventListener('change',()=>{clearMapSelection();renderMapa()}));$('#btnReloadMap').onclick=reloadMap;$('#btnMapFullscreen').onclick=()=>document.fullscreenElement?document.exitFullscreen():$('#plantMap').requestFullscreen?.();window.addEventListener('resize',()=>requestAnimationFrame(syncMapOverlays));document.addEventListener('fullscreenchange',()=>setTimeout(syncMapOverlays,80));$('#plantMapImg')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('.home-map-preview img')?.addEventListener('load',()=>requestAnimationFrame(syncMapOverlays));$('#btnUnlockDifusion').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminDifusionPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
 $('#btnUnlockOperacionales').onclick=()=>{const k=prompt('Clave de acceso UNACEM:');if(k===cfg.ADMIN_KEY)$('#adminOperacionalesPanel').classList.remove('hidden');else if(k)showModal('Clave incorrecta','<p>No se habilitó la edición.</p>')};
 $('#btnSaveDifusionMaterial').onclick=disableDuring($('#btnSaveDifusionMaterial'),()=>saveMaterialFromPanel('difusion'));
 $('#btnSaveOperacionalMaterial').onclick=disableDuring($('#btnSaveOperacionalMaterial'),()=>saveMaterialFromPanel('operacional'));
-['dfTipo','dfEmpresa','dfEstado','dfSearch'].forEach(id=>$('#'+id)?.addEventListener('change',renderDifusion));
+['dfTipo','dfEmpresa','dfSede','dfEstado','dfSearch'].forEach(id=>$('#'+id)?.addEventListener('change',renderDifusion));
 $('#btnDfApply').onclick=renderDifusion;$('#coAnio').value=new Date().getFullYear();$('#coMes').value=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][new Date().getMonth()];[['coFotos1','coPrev1'],['coFotos2','coPrev2'],['coFotos3','coPrev3']].forEach(([i,p])=>$('#'+i).onchange=()=>previewPhotos($('#'+i),$('#'+p)));$('#btnSaveControles').onclick=disableDuring($('#btnSaveControles'),saveControles);$('#coFiltroEmpresa').onchange=renderControles;$('#btnUnlockReview').onclick=()=>requestUnacemReviewAccess(()=>{state.reviewUnlocked=true;$('#reviewLocked').classList.add('hidden');$('#reviewArea').classList.remove('hidden');renderReviewQueue()});$('#btnRenderReview').onclick=renderReviewQueue;if(hasRememberedReviewAccess()){state.reviewUnlocked=true;$('#reviewLocked')?.classList.add('hidden');$('#reviewArea')?.classList.remove('hidden')}try{await refreshData();await reloadMap()}catch(e){showModal('Falta conectar el backend',`<p>${esc(e.message)}</p><p>Conserva en config.js la misma URL /exec que ya utiliza tu implementación.</p>`)}renderEqBatch();renderPeBatch();equipmentCertUI()}
 init();

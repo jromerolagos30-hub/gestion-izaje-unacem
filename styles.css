@@ -336,3 +336,7 @@
 .review-cc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 .review-email-help{margin-top:9px;font-size:11px;color:#7f1d1d}
 @media(max-width:700px){.review-cc-grid{grid-template-columns:1fr}}
+
+/* V5.5 - mejoras responsive, IA y filtros */
+.ai-validation-note{display:flex;gap:12px;align-items:flex-start;margin:14px 0;padding:13px 15px;border:1px solid #cfe1f5;background:#f4f9ff;border-radius:12px;color:#17324d}.ai-validation-icon{display:grid;place-items:center;flex:0 0 34px;height:34px;border-radius:50%;background:#13283a;color:#fff;font-size:18px}.ai-validation-note b{display:block;margin-bottom:3px}.ai-validation-note small{display:block;line-height:1.45;color:#526779}.filters{flex-wrap:wrap}.filters>select,.filters>input{min-width:170px}.chart-box{overflow:visible}.chart-box canvas{max-width:100%}
+@media(max-width:700px){.panel-grid-2{gap:10px}.chart-box,.chart-box.tall{min-height:260px;height:auto}.panel:has(.chart-box){padding:14px 10px}.filters>select,.filters>input,.filters>.btn{width:100%;min-width:0}.ai-validation-note{padding:12px}.data-table{font-size:12px}.data-table th,.data-table td{padding:9px 8px}}

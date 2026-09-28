@@ -118,7 +118,7 @@
       <label>Vigencia<input id="peVigencia" type="date" readonly></label><label>Empresa que brindó la capacitación<input id="peCapEmpresa" value="ISEM" readonly></label>
       <label class="span-2">Certificado*<input id="peArchivo" type="file" multiple accept="image/*,.pdf"></label>
     </div>
-    <div class="action-row"><button id="btnAddPersonal" class="btn primary">+ Agregar a la lista</button><button id="btnClearPersonal" class="btn secondary">Limpiar campos</button></div>
+    <div class="ai-validation-note"><span class="ai-validation-icon">✦</span><div><b>Validación automática IMC</b><small>Al agregar la competencia, el Agente IA de IMC revisará el certificado y comparará la información declarada antes de permitir el registro.</small></div></div><div class="action-row"><button id="btnAddPersonal" class="btn primary">✦ Validar con IA y agregar</button><button id="btnClearPersonal" class="btn secondary">Limpiar campos</button></div>
   </div>
   <div class="panel"><div class="panel-head"><h3>Competencias por registrar</h3><span id="peBatchCount" class="pill neutral">0 personas</span></div><div id="peBatchTable"></div><div class="action-row right"><button id="btnSavePersonal" class="btn primary">Registrar Competencias</button></div></div>
 </section>
@@ -126,7 +126,7 @@
 <section id="view-seguimiento" class="view">
   <div class="section-title"><div><h2>Estatus de Competencias y Equipos de Izaje</h2><p>Consulta, levanta observaciones, visualiza documentos y genera masters PDF.</p></div></div>
   <div class="panel"><div class="filters">
-    <select id="fEmpresa"></select><select id="fEquipo"></select>
+    <select id="fEmpresa"></select><select id="fSede"><option value="">Todas las sedes</option><option>Atocongo</option><option>Condorcocha</option><option>Terminal Portuario</option></select><select id="fEquipo"></select><select id="fCapacitacion"></select>
     <select id="fEstado"><option value="">Todos los estados</option><option>En revisión</option><option>Aprobado</option><option>Observado</option></select>
     <input id="fSearch" placeholder="Buscar por serie, DNI, nombre..."><button id="btnApplyFilters" class="btn primary">Filtrar</button>
   </div></div>
@@ -172,6 +172,7 @@
         <option value="Lecciones Aprendidas">Lecciones Aprendidas</option>
       </select>
       <select id="dfEmpresa"></select>
+      <select id="dfSede"><option value="">Todas las sedes</option><option>Atocongo</option><option>Condorcocha</option><option>Terminal Portuario</option></select>
       <select id="dfEstado">
         <option value="">Todos los estados</option>
         <option value="Difundido">Difundido</option>
