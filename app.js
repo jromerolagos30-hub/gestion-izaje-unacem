@@ -169,24 +169,49 @@ function applyInteractiveStatusSelection(arr){
 function drawCompanyStatus(id,arr,key,targetTable){
   const el=$('#'+id);if(!el)return;
   if(state.charts[key])state.charts[key].destroy();
-  const companies=[...new Set(arr.map(x=>x.empresa||'Sin empresa'))];
+
   const statuses=['Aprobado','En revisión','Observado'];
   const palette=['#22a05a','#f0ae22','#ed1c24'];
   const selectedColor='#172536';
   const sel=getStatusChartSelection();
+
+  // Agrupa por empresa y ordena de mayor a menor cantidad total.
+  const grouped={};
+  arr.forEach(x=>{
+    const company=x.empresa||'Sin empresa';
+    if(!grouped[company])grouped[company]={'Aprobado':0,'En revisión':0,'Observado':0,total:0};
+    const st=statuses.find(s=>norm(x.estadoRevision)===norm(s));
+    if(st)grouped[company][st]++;
+    grouped[company].total++;
+  });
+
+  const companies=Object.keys(grouped).sort((a,b)=>grouped[b].total-grouped[a].total||a.localeCompare(b));
+
+  // Más espacio vertical por empresa, especialmente en celular.
+  const box=el.closest('.chart-box');
+  if(box)box.style.height=Math.max(300,companies.length*54+100)+'px';
+
   const datasets=statuses.map((s,i)=>({
     label:s,
-    data:companies.map(c=>arr.filter(x=>(x.empresa||'Sin empresa')===c&&norm(x.estadoRevision)===norm(s)).length),
+    data:companies.map(c=>grouped[c][s]||0),
     backgroundColor:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?selectedColor:palette[i]),
     borderColor:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?'#172536':'#fff'),
-    borderWidth:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?3:1)
+    borderWidth:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?3:1),
+    borderRadius:6,
+    barPercentage:.78,
+    categoryPercentage:.82
   }));
+
   state.charts[key]=new Chart(el,{
     type:'bar',
     data:{labels:companies,datasets},
-    plugins:[stackTotalsPlugin],
+    // Ya no se usa stackTotalsPlugin: se retira "Total X".
+    plugins:[ChartDataLabels],
     options:{
-      indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:24}},
+      indexAxis:'y',
+      responsive:true,
+      maintainAspectRatio:false,
+      layout:{padding:{right:38}},
       onClick:(evt,elements,chart)=>{
         if(!elements.length)return;
         const hit=elements[0];
@@ -198,14 +223,37 @@ function drawCompanyStatus(id,arr,key,targetTable){
       },
       onHover:(evt,elements)=>{if(evt.native?.target)evt.native.target.style.cursor=elements.length?'pointer':'default'},
       plugins:{
-        legend:{position:'bottom',labels:{boxWidth:28,padding:14}},
-        datalabels:{display:ctx=>Number(ctx.dataset.data[ctx.dataIndex])>0,color:'#fff',anchor:'center',align:'center',clamp:true,font:{weight:'800',size:13},textStrokeColor:'rgba(0,0,0,.22)',textStrokeWidth:2,formatter:v=>v>0?String(v):''},
-        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,footer:()=> 'Clic para filtrar las tablas · clic nuevamente para quitar filtro'}}
+        legend:{position:'bottom',labels:{boxWidth:22,padding:14}},
+        datalabels:{
+          display:ctx=>Number(ctx.dataset.data[ctx.dataIndex])>0,
+          color:'#263442',
+          anchor:'end',
+          align:'right',
+          offset:4,
+          clamp:true,
+          font:{weight:'800',size:12},
+          formatter:v=>v>0?String(v):''
+        },
+        tooltip:{callbacks:{
+          label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,
+          footer:()=> 'Clic para filtrar las tablas · clic nuevamente para quitar filtro'
+        }}
       },
-      scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0,stepSize:1}},y:{stacked:true,ticks:{autoSkip:false,font:{size:11}}}}
+      scales:{
+        x:{
+          stacked:false,
+          beginAtZero:true,
+          ticks:{precision:0}
+        },
+        y:{
+          stacked:false,
+          ticks:{autoSkip:false,font:{size:11}}
+        }
+      }
     }
   });
 }
+
 function captureUiFilters(){
   const ids=['fEmpresa','fSede','fEquipo','fCapacitacion','fEstado','fSearch','dfTipo','dfEmpresa','dfSede','dfEstado','dfSearch','rvTipo','rvEstado','rvEmpresa'];
   return Object.fromEntries(ids.map(id=>[id,$('#'+id)?.value??'']));
