@@ -16,6 +16,26 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&
 const norm=v=>String(v??'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 const fmtDate=v=>{if(!v)return'';const d=new Date(v);return isNaN(d)?String(v):d.toLocaleDateString('es-PE')};
 const addYears=(v,n)=>{if(!v)return'';const d=new Date(v+'T12:00:00');d.setFullYear(d.getFullYear()+n);return d.toISOString().slice(0,10)};
+// Fechas de vencimiento: calendario local, sin confundir DD/MM/AAAA con MM/DD/AAAA.
+function fechaVencimientoIMC(valor){
+ if(!valor)return null;
+ if(valor instanceof Date)return isNaN(valor)?null:new Date(valor.getFullYear(),valor.getMonth(),valor.getDate());
+ const t=String(valor).trim();
+ let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+ if(m){const d=new Date(+m[1],+m[2]-1,+m[3]);return d.getFullYear()===+m[1]&&d.getMonth()===+m[2]-1&&d.getDate()===+m[3]?d:null}
+ m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+ if(m){const d=new Date(+m[3],+m[2]-1,+m[1]);return d.getFullYear()===+m[3]&&d.getMonth()===+m[2]-1&&d.getDate()===+m[1]?d:null}
+ const d=new Date(t);return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function estadoVigenciaIMC(registro){
+ const fecha=fechaVencimientoIMC(registro.vigencia||registro.vigenciaCertificado||registro.fechaVencimiento);
+ if(!fecha)return 'SIN_FECHA';
+ const hoy=new Date();hoy.setHours(0,0,0,0);
+ const dias=Math.round((fecha-hoy)/86400000);
+ return dias<0?'VENCIDO':dias<=30?'PROXIMO':'VIGENTE';
+}
+function kpisVigenciaIMC(arr){return {proximos:arr.filter(x=>estadoVigenciaIMC(x)==='PROXIMO').length,vencidos:arr.filter(x=>estadoVigenciaIMC(x)==='VENCIDO').length}}
+function htmlKpisIMC(items){return items.map(k=>`<div class="kpi"><div class="label">${esc(k[0])}</div><div class="value">${k[1]}</div><div class="sub">${esc(k[2])}</div></div>`).join('')}
 function statusBadge(v){const n=norm(v);let c=n.includes('aprob')?'aprobado':n.includes('revision')?'revision':n.includes('observ')?'observado':n.includes('operativo')?'operativo':n.includes('inoper')?'inoperativo':n.includes('fuera')?'fuera':n.includes('cumpl')?'cumplido':n.includes('venc')?'vencido':'';return `<span class="status ${c}">${esc(v||'')}</span>`}
 async function api(action,payload={}){if(!cfg.API_URL||cfg.API_URL.includes('PEGA_AQUI'))throw new Error('Configura API_URL en config.js con tu URL /exec de Apps Script.');const r=await fetch(cfg.API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,...payload})});const j=await r.json();if(!j.ok)throw new Error(j.error||'Error del servidor');return j.data}
 function go(view){$$('.view').forEach(x=>x.classList.remove('active'));$('#view-'+view)?.classList.add('active');$$('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.view===view));if(view==='equipos')renderEquiposStats();if(view==='personal')renderPersonalStats();if(view==='seguimiento')renderSeguimiento();if(view==='mapa')renderMapa();if(view==='difusion')renderDifusion();if(view==='controles'){renderOperationalMaterials();renderControles();}if(view==='revision'&&state.reviewUnlocked)renderReviewQueue();window.scrollTo({top:0,behavior:'smooth'})}
@@ -169,49 +189,24 @@ function applyInteractiveStatusSelection(arr){
 function drawCompanyStatus(id,arr,key,targetTable){
   const el=$('#'+id);if(!el)return;
   if(state.charts[key])state.charts[key].destroy();
-
+  const companies=[...new Set(arr.map(x=>x.empresa||'Sin empresa'))];
   const statuses=['Aprobado','En revisión','Observado'];
   const palette=['#22a05a','#f0ae22','#ed1c24'];
   const selectedColor='#172536';
   const sel=getStatusChartSelection();
-
-  // Agrupa por empresa y ordena de mayor a menor cantidad total.
-  const grouped={};
-  arr.forEach(x=>{
-    const company=x.empresa||'Sin empresa';
-    if(!grouped[company])grouped[company]={'Aprobado':0,'En revisión':0,'Observado':0,total:0};
-    const st=statuses.find(s=>norm(x.estadoRevision)===norm(s));
-    if(st)grouped[company][st]++;
-    grouped[company].total++;
-  });
-
-  const companies=Object.keys(grouped).sort((a,b)=>grouped[b].total-grouped[a].total||a.localeCompare(b));
-
-  // Más espacio vertical por empresa, especialmente en celular.
-  const box=el.closest('.chart-box');
-  if(box)box.style.height=Math.max(300,companies.length*54+100)+'px';
-
   const datasets=statuses.map((s,i)=>({
     label:s,
-    data:companies.map(c=>grouped[c][s]||0),
+    data:companies.map(c=>arr.filter(x=>(x.empresa||'Sin empresa')===c&&norm(x.estadoRevision)===norm(s)).length),
     backgroundColor:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?selectedColor:palette[i]),
     borderColor:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?'#172536':'#fff'),
-    borderWidth:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?3:1),
-    borderRadius:6,
-    barPercentage:.78,
-    categoryPercentage:.82
+    borderWidth:companies.map(c=>(sel.company===c&&norm(sel.status)===norm(s))?3:1)
   }));
-
   state.charts[key]=new Chart(el,{
     type:'bar',
     data:{labels:companies,datasets},
-    // Ya no se usa stackTotalsPlugin: se retira "Total X".
-    plugins:[ChartDataLabels],
+    plugins:[stackTotalsPlugin],
     options:{
-      indexAxis:'y',
-      responsive:true,
-      maintainAspectRatio:false,
-      layout:{padding:{right:38}},
+      indexAxis:'y',responsive:true,maintainAspectRatio:false,layout:{padding:{right:24}},
       onClick:(evt,elements,chart)=>{
         if(!elements.length)return;
         const hit=elements[0];
@@ -223,37 +218,14 @@ function drawCompanyStatus(id,arr,key,targetTable){
       },
       onHover:(evt,elements)=>{if(evt.native?.target)evt.native.target.style.cursor=elements.length?'pointer':'default'},
       plugins:{
-        legend:{position:'bottom',labels:{boxWidth:22,padding:14}},
-        datalabels:{
-          display:ctx=>Number(ctx.dataset.data[ctx.dataIndex])>0,
-          color:'#263442',
-          anchor:'end',
-          align:'right',
-          offset:4,
-          clamp:true,
-          font:{weight:'800',size:12},
-          formatter:v=>v>0?String(v):''
-        },
-        tooltip:{callbacks:{
-          label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,
-          footer:()=> 'Clic para filtrar las tablas · clic nuevamente para quitar filtro'
-        }}
+        legend:{position:'bottom',labels:{boxWidth:28,padding:14}},
+        datalabels:{display:ctx=>Number(ctx.dataset.data[ctx.dataIndex])>0,color:'#fff',anchor:'center',align:'center',clamp:true,font:{weight:'800',size:13},textStrokeColor:'rgba(0,0,0,.22)',textStrokeWidth:2,formatter:v=>v>0?String(v):''},
+        tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw}`,footer:()=> 'Clic para filtrar las tablas · clic nuevamente para quitar filtro'}}
       },
-      scales:{
-        x:{
-          stacked:false,
-          beginAtZero:true,
-          ticks:{precision:0}
-        },
-        y:{
-          stacked:false,
-          ticks:{autoSkip:false,font:{size:11}}
-        }
-      }
+      scales:{x:{stacked:true,beginAtZero:true,ticks:{precision:0,stepSize:1}},y:{stacked:true,ticks:{autoSkip:false,font:{size:11}}}}
     }
   });
 }
-
 function captureUiFilters(){
   const ids=['fEmpresa','fSede','fEquipo','fCapacitacion','fEstado','fSearch','dfTipo','dfEmpresa','dfSede','dfEstado','dfSearch','rvTipo','rvEstado','rvEmpresa'];
   return Object.fromEntries(ids.map(id=>[id,$('#'+id)?.value??'']));
@@ -276,13 +248,37 @@ async function refreshData(){
 function populateSelectors(){const emps=(state.empresas||[]).filter(x=>String(x.activo||'SI').toUpperCase()!=='NO').map(x=>x.empresa);['eqEmpresa','peEmpresa','fEmpresa','mapEmpresa','coEmpresa','coFiltroEmpresa','rvEmpresa'].forEach(id=>setOptions($('#'+id),emps,['fEmpresa','mapEmpresa','coFiltroEmpresa','rvEmpresa'].includes(id)?'Todas las empresas':'Seleccionar empresa'));setOptions($('#eqTipo'),state.tipos||[],'Seleccionar equipo');setOptions($('#peCapacitacion'),state.competencias||[],'Seleccionar competencia');setOptions($('#fEquipo'),state.tipos||[],'Todos los equipos');setOptions($('#fCapacitacion'),state.competencias||[],'Todas las competencias');const certBase=[...(state.certificadoras||[])];
 const certFallback=['COPMEC','Operatec','Certifica','CS BEAVER','Bureau Veritas','Industry Certificaciones','SGS'];
 certFallback.forEach(x=>{if(!certBase.some(v=>norm(v)===norm(x)))certBase.push(x)});
-setOptions($('#eqCertificadora'),[...certBase,'Certificado del propio fabricante','Otro'],'Seleccionar certificadora');if($('#dfEmpresa'))setOptions($('#dfEmpresa'),emps,'Todas las empresas');if($('#opBpCategoria'))setOptions($('#opBpCategoria'),OPERATIONAL_CATS,'Seleccionar apartado')}
+setOptions($('#eqCertificadora'),[...certBase.filter(v=>norm(v)!=='otro'),'Certificado del propio fabricante'],'Seleccionar certificadora');if($('#dfEmpresa'))setOptions($('#dfEmpresa'),emps,'Todas las empresas');if($('#opBpCategoria'))setOptions($('#opBpCategoria'),OPERATIONAL_CATS,'Seleccionar apartado')}
 function renderHome(){renderHomeMapPreview()}
-function renderEquiposStats(){const a=state.equipos||[];if($('#eqKpis'))$('#eqKpis').innerHTML=[['Equipos registrados',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawChart('chartEquiposTipo','bar',countBy(a,'tipo'),'eqTipo',false);drawChart('chartEquiposRevision','bar',countBy(a,'estadoRevision'),'eqRev',false)}
-function renderPersonalStats(){const a=state.personal||[];if($('#peKpis'))$('#peKpis').innerHTML=[['Personal registrado',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');drawChart('chartPersonalCap','doughnut',countBy(a,'capacitacion'),'peCap',true);drawChart('chartPersonalRevision','doughnut',countBy(a,'estadoRevision'),'peRev',true)}
-function equipmentCertUI(){const v=$('#eqCertificadora').value,other=v==='Otro',manufacturer=v==='Certificado del propio fabricante';$('#eqOtraWrap').classList.toggle('hidden',!other);$('#eqFabricanteWrap').classList.toggle('hidden',!manufacturer);const special=other||manufacturer;$('#eqArchivoLabel').childNodes[0].nodeValue=special?'Certificado de Operatividad / Ficha Técnica / Orden de Compra*':'Certificado de Operatividad / Ficha Técnica*';$('#eqFechaOptional').textContent=manufacturer?'(opcional si no figura en el certificado)':'';const w=$('#eqWarning');if(other){w.textContent='La empresa certificadora no está en la lista homologada. El registro quedará en evaluación por UNACEM.';w.classList.remove('hidden')}else if(manufacturer){w.textContent='Si el certificado del fabricante no cuenta con fecha de certificación, adjunta la Orden de Compra que valide la fecha de adquisición. El registro quedará en evaluación por UNACEM.';w.classList.remove('hidden')}else w.classList.add('hidden')}
+function renderEquiposStats(){const a=state.equipos||[];const v=kpisVigenciaIMC(a);if($('#eqKpis'))$('#eqKpis').innerHTML=htmlKpisIMC([['Equipos registrados',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar'],['Próximos a vencer',v.proximos,'Dentro de 30 días'],['Vencidos',v.vencidos,'Certificación vencida']]);drawChart('chartEquiposTipo','bar',countBy(a,'tipo'),'eqTipo',false);drawChart('chartEquiposRevision','bar',countBy(a,'estadoRevision'),'eqRev',false)}
+function renderPersonalStats(){const a=state.personal||[];const v=kpisVigenciaIMC(a);if($('#peKpis'))$('#peKpis').innerHTML=htmlKpisIMC([['Personal registrado',a.length,'Total'],['Aprobados',a.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],['Observados',a.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar'],['Próximos a vencer',v.proximos,'Dentro de 30 días'],['Vencidos',v.vencidos,'Certificación vencida']]);drawChart('chartPersonalCap','doughnut',countBy(a,'capacitacion'),'peCap',true);drawChart('chartPersonalRevision','doughnut',countBy(a,'estadoRevision'),'peRev',true)}
+function equipmentCertUI(){
+ const manufacturer=$('#eqCertificadora').value==='Certificado del propio fabricante';
+ $('#eqOtraWrap').classList.add('hidden');
+ $('#eqFabricanteWrap').classList.toggle('hidden',!manufacturer);
+ $('#eqArchivoLabel').childNodes[0].nodeValue='Certificado de Operatividad*';
+ $('#eqFechaOptional').textContent=manufacturer?'(opcional si no figura en el certificado)':'';
+ const w=$('#eqWarning');
+ w.classList.toggle('hidden',!manufacturer);
+ if(manufacturer)w.textContent='El certificado del fabricante será verificado por IA. Si no es posible acreditar los datos críticos, gestiona el sustento directamente con UNACEM.';
+}
 function clearEquipo(){['eqMarca','eqModelo','eqSerie','eqCapacidad','eqLugar','eqOtraCertificadora','eqFabricante','eqFechaCert','eqVigencia'].forEach(id=>$('#'+id).value='');$('#eqArchivo').value=''}
-async function addEquipo(){const cert=$('#eqCertificadora').value,manufacturer=cert==='Certificado del propio fabricante',other=cert==='Otro';if(!$('#eqEmpresa').value||!$('#eqTipo').value||!$('#eqSerie').value||!cert)return showModal('Faltan datos','<p>Completa Empresa, Tipo de equipo, N° serie y Empresa certificadora.</p>');if(other&&!$('#eqOtraCertificadora').value.trim())return showModal('Falta certificadora','<p>Indica el nombre de la empresa certificadora.</p>');if(manufacturer&&!$('#eqFabricante').value.trim())return showModal('Falta fabricante','<p>Indica el nombre del fabricante.</p>');if(!manufacturer&&!$('#eqFechaCert').value)return showModal('Falta fecha','<p>La fecha de certificación es obligatoria salvo certificado del fabricante sin fecha.</p>');const files=await filesToObjs($('#eqArchivo'),8);if(!files.length)return showModal('Adjunto requerido','<p>Adjunta al menos un documento.</p>');state.eqBatch.push({empresa:$('#eqEmpresa').value,sede:$('#eqSede').value,tipo:$('#eqTipo').value,estado:$('#eqEstado').value,marca:$('#eqMarca').value,modelo:$('#eqModelo').value,serie:$('#eqSerie').value,capacidad:$('#eqCapacidad').value,lugar:$('#eqLugar').value,certificadora:cert,otraCertificadora:$('#eqOtraCertificadora').value,fabricante:$('#eqFabricante').value,fechaCert:$('#eqFechaCert').value,vigencia:$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'',archivos:files});renderEqBatch();clearEquipo()}
+async function addEquipo(){
+ const cert=$('#eqCertificadora').value;
+ const manufacturer=cert==='Certificado del propio fabricante';
+ if(!$('#eqEmpresa').value||!$('#eqTipo').value||!$('#eqSerie').value||!cert||!$('#eqMarca').value.trim()||!$('#eqCapacidad').value)
+   return showModal('Faltan datos','<p>Completa Empresa, Tipo, Marca, N° serie, Capacidad y Empresa certificadora.</p>');
+ if(cert==='Otro')return showModal('Certificadora no disponible','<p>Gestiona la validación del sustento directamente con UNACEM.</p>');
+ if(manufacturer&&!$('#eqFabricante').value.trim())return showModal('Falta fabricante','<p>Indica el nombre del fabricante.</p>');
+ if(!manufacturer&&!$('#eqFechaCert').value)return showModal('Falta fecha','<p>Ingresa la fecha de certificación, inspección o emisión.</p>');
+ const files=await filesToObjs($('#eqArchivo'),8);
+ if(!files.length)return showModal('Adjunto requerido','<p>Adjunta el Certificado de Operatividad.</p>');
+ const item={empresa:$('#eqEmpresa').value,sede:$('#eqSede').value,tipo:$('#eqTipo').value,estado:$('#eqEstado').value,marca:$('#eqMarca').value,modelo:$('#eqModelo').value,serie:$('#eqSerie').value,capacidad:$('#eqCapacidad').value,lugar:$('#eqLugar').value,certificadora:cert,otraCertificadora:'',fabricante:$('#eqFabricante').value,fechaCert:$('#eqFechaCert').value,vigencia:$('#eqFechaCert').value?addYears($('#eqFechaCert').value,1):'',archivos:files};
+ // La revisión IA de equipos se procesa al guardar en Apps Script/n8n.
+ // Una observación IA no bloquea el registro: la decisión final es de UNACEM.
+ state.eqBatch.push(item);renderEqBatch();clearEquipo();
+ showModal('Equipo agregado', '<p>Equipo agregado a la lista. Al guardar, el Agente IA revisará el certificado. Si encuentra discrepancias, quedará <b>OBSERVADO POR AGENTE IA</b> y pendiente de decisión final en <b>Revisar / Actualizar por UNACEM</b>.</p>');
+}
 function renderEqBatch(){$('#eqBatchCount').textContent=`${state.eqBatch.length} equipos`;$('#eqBatchTable').innerHTML=tableSimple(state.eqBatch,['empresa','tipo','marca','serie','capacidad','certificadora'],['Empresa','Equipo','Marca','Serie','Capacidad','Certificadora'])}
 async function saveEquipos(){if(!state.eqBatch.length)return showModal('Sin registros','<p>Agrega al menos un equipo.</p>');const r=await api('saveEquipos',{items:state.eqBatch});state.eqBatch=[];renderEqBatch();await refreshData();showModal('Registro enviado',`<p>Se registraron <b>${r.count}</b> equipos. La información quedó En revisión.</p>`)}
 function clearPersonal(){['peNombre','peDni','peFecha','peVigencia'].forEach(id=>$('#'+id).value='');$('#peCapEmpresa').value='ISEM';$('#peArchivo').value=''}
@@ -346,7 +342,11 @@ function renderSeguimiento(){
     ['Equipos',fe.length,'Inventario filtrado'],
     ['Personal',fp.length,'Competencias filtradas'],
     ['Aprobados',fe.filter(x=>norm(x.estadoRevision).includes('aprob')).length+fp.filter(x=>norm(x.estadoRevision).includes('aprob')).length,'Validados'],
-    ['Observados',fe.filter(x=>norm(x.estadoRevision).includes('observ')).length+fp.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar']
+    ['Observados',fe.filter(x=>norm(x.estadoRevision).includes('observ')).length+fp.filter(x=>norm(x.estadoRevision).includes('observ')).length,'Por levantar'],
+    ['Equipos próximos a vencer',kpisVigenciaIMC(fe).proximos,'Dentro de 30 días'],
+    ['Equipos vencidos',kpisVigenciaIMC(fe).vencidos,'Certificación vencida'],
+    ['Personal próximo a vencer',kpisVigenciaIMC(fp).proximos,'Dentro de 30 días'],
+    ['Personal vencido',kpisVigenciaIMC(fp).vencidos,'Certificación vencida']
   ].map(k=>`<div class="kpi"><div class="label">${k[0]}</div><div class="value">${k[1]}</div><div class="sub">${k[2]}</div></div>`).join('');
 
   // Las gráficas conservan TODAS las barras de los filtros superiores.

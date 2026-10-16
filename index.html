@@ -74,7 +74,7 @@
 </section>
 
 <section id="view-equipos" class="view">
-  <div class="section-title"><div><h2>Inventario de Equipos de Izaje</h2><p>Registro rápido, documentos y vigencia máxima de certificación de 1 año.</p></div><span class="pill">Estado inicial: En revisión</span></div>
+  <div class="section-title"><div><h2>Inventario de Equipos de Izaje</h2><p>Registro de equipos con prevalidación documental automática mediante IA.</p></div><span class="pill">Estado inicial: En revisión</span></div>
   <div id="eqKpis" class="kpi-grid mini"></div>
   <div class="panel-grid-2">
     <div class="panel"><div class="panel-head"><h3>Equipos por tipo</h3></div><div class="chart-box"><canvas id="chartEquiposTipo"></canvas></div></div>
@@ -94,10 +94,10 @@
       <label id="eqFabricanteWrap" class="hidden">Nombre del fabricante*<input id="eqFabricante"></label>
       <label>Fecha certificación <span id="eqFechaOptional" class="helper"></span><input id="eqFechaCert" type="date"></label>
       <label>Vigencia del certificado<input id="eqVigencia" type="date" readonly></label>
-      <label id="eqArchivoLabel" class="span-2">Certificado de Operatividad / Ficha Técnica*<input id="eqArchivo" type="file" multiple accept="image/*,.pdf"></label>
+      <label id="eqArchivoLabel" class="span-2">Certificado de Operatividad*<input id="eqArchivo" type="file" multiple accept="image/*,.pdf"></label>
     </div>
     <div id="eqWarning" class="notice warning hidden"></div>
-    <div class="notice info">Puedes adjuntar varios archivos. Si seleccionas “Otro” o “Certificado del propio fabricante”, el registro quedará en evaluación por UNACEM.</div>
+    <div class="notice info">Adjunta el Certificado de Operatividad. La IA verificará los datos antes de permitir agregar el equipo; si existen diferencias, gestiona el sustento directamente con UNACEM.</div>
     <div class="action-row"><button id="btnAddEquipo" class="btn primary">+ Agregar a la lista</button><button id="btnClearEquipo" class="btn secondary">Limpiar campos</button></div>
   </div>
   <div class="panel"><div class="panel-head"><h3>Equipos por registrar</h3><span id="eqBatchCount" class="pill neutral">0 equipos</span></div><div id="eqBatchTable"></div><div class="action-row right"><button id="btnSaveEquipos" class="btn primary">Registrar Equipo</button></div></div>
