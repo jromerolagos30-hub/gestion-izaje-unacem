@@ -130,7 +130,9 @@
     <select id="fEstado"><option value="">Todos los estados</option><option>En revisión</option><option>Aprobado</option><option>Observado</option></select>
     <input id="fSearch" placeholder="Buscar por serie, DNI, nombre..."><button id="btnApplyFilters" class="btn primary">Filtrar</button>
   </div></div>
-  <div id="trackKpis" class="kpi-grid"></div>
+  <div class="panel-head" style="margin-top:16px"><h3>Resumen general y validación documental</h3></div><div id="trackKpis" class="kpi-grid"></div>
+  <div class="panel" style="margin-top:16px;border-left:5px solid #ed1c24"><div class="panel-head"><div><h3>Equipos de izaje · Alertas de certificación</h3><p style="color:#64748b;font-size:13px;margin:5px 0 0">Solo equipos vencidos o que vencen dentro de los próximos 30 días, por empresa.</p></div></div><div class="chart-box"><canvas id="chartEquiposVencimientosEmpresa"></canvas></div></div>
+  <div class="panel" style="margin-top:16px;border-left:5px solid #245e96"><div class="panel-head"><div><h3>Competencias del personal · Alertas de certificación</h3><p style="color:#64748b;font-size:13px;margin:5px 0 0">Solo personal vencido o que vence dentro de los próximos 30 días, por empresa.</p></div></div><div class="chart-box"><canvas id="chartPersonalVencimientosEmpresa"></canvas></div></div>
   <div class="panel-grid-2">
     <div class="panel"><div class="panel-head"><h3>Estado de equipos por empresa</h3></div><div class="chart-box tall"><canvas id="chartEquiposEmpresaStatus"></canvas></div></div>
     <div class="panel"><div class="panel-head"><h3>Estado de competencias por empresa</h3></div><div class="chart-box tall"><canvas id="chartPersonalEmpresaStatus"></canvas></div></div>
